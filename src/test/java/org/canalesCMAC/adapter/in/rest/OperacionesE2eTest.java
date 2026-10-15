@@ -144,10 +144,10 @@ class OperacionesE2eTest {
     }
 
     @Test
-    void claroPagoDeudaFlujoCompleto() {
+    void claroPagoFlujoCompleto() {
         given()
             .contentType(ContentType.JSON)
-            .body("{\"institucion\":\"CLARO\",\"operador\":\"PAGO_DEUDA\",\"datos\":{\"monto\":\"10.00\"}}")
+            .body("{\"institucion\":\"CLARO\",\"operador\":\"PAGO\",\"datos\":{\"monto\":\"10.00\"}}")
             .when().post("/api/v1/operaciones")
             .then()
             .statusCode(200)
@@ -182,10 +182,10 @@ class OperacionesE2eTest {
     }
 
     @Test
-    void municipalidadCuscoConsultaDeudaFlujoCompleto() {
+    void municipalidadCuscoRecuperarOrdenPagoFlujoCompleto() {
         given()
             .contentType(ContentType.JSON)
-            .body("{\"institucion\":\"MUNICIPALIDAD_CUSCO\",\"operador\":\"CONSULTA_DEUDA\",\"datos\":{"
+            .body("{\"institucion\":\"MUNICIPALIDAD_CUSCO\",\"operador\":\"RECUPERAR_ORDEN_PAGO\",\"datos\":{"
                 + "\"ordenpago\":\"123\"}}")
             .when().post("/api/v1/operaciones")
             .then()

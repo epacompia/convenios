@@ -33,7 +33,7 @@ public class WesternUnionSoapMessageCodec implements MapeadorOperacion {
 
     @Override
     public Institucion institucion() {
-        return Institucion.WESTER_UNION;
+        return Institucion.WESTERN_UNION;
     }
 
     @Override
@@ -199,7 +199,7 @@ public class WesternUnionSoapMessageCodec implements MapeadorOperacion {
         }
 
         return new RecaudacionResponse(
-            Institucion.WESTER_UNION,
+            Institucion.WESTERN_UNION,
             peticion.operador(),
             codigoRespuesta,
             codigoAutorizacion,
