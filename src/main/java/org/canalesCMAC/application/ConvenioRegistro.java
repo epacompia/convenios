@@ -100,6 +100,10 @@ public class ConvenioRegistro {
         return protocolos.getOrDefault(institucion, PROTOCOLO_POR_DEFECTO);
     }
 
+    public String autenticacionTipo(Institucion institucion) {
+        return autenticaciones.getOrDefault(institucion, AUTENTICACION_POR_DEFECTO);
+    }
+
     public String url(Institucion institucion) {
         return urls.getOrDefault(institucion, "");
     }

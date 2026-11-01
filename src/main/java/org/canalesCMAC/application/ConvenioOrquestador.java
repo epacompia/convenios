@@ -36,6 +36,9 @@ public class ConvenioOrquestador {
     @Inject
     Instance<ProtocoloCliente> clientes;
 
+    @Inject
+    ProveedorResiliente resiliencia;
+
     private Map<Institucion, MapeadorOperacion> mapeadoresPorInstitucion;
     private Map<String, ProtocoloCliente> clientesPorProtocolo;
 
@@ -85,7 +88,7 @@ public class ConvenioOrquestador {
             peticion.institucion(), peticion.operador(), convenio.protocolo(),
             peticion.cabecera().idTransaccion());
         PeticionSalida salida = mapeador.construir(peticion);
-        RespuestaCruda respuesta = cliente.ejecutar(convenio, salida);
+        RespuestaCruda respuesta = resiliencia.ejecutar(cliente, convenio, salida, peticion);
         try {
             RecaudacionResponse interpretada = mapeador.interpretar(respuesta, peticion);
             return conCabecera(interpretada, peticion);
