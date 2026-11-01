@@ -17,17 +17,22 @@ public class RecaudacionUseCaseImpl implements RecaudacionUseCase {
     RecaudacionResolver resolver;
 
     @Inject
+    ValidadorSolicitud validador;
+
+    @Inject
     RecaudacionChannel canal;
 
     @Override
     public RecaudacionResponse procesar(RecaudacionRequest solicitud) {
         long inicio = System.nanoTime();
-        LOG.debugf("inicio de recaudacion institucion=%s operador=%s",
-            solicitud.institucion(), solicitud.operador());
+        LOG.debugf("inicio de recaudacion institucion=%s operador=%s idTransaccion=%s",
+            solicitud.institucion(), solicitud.operador(), solicitud.cabecera().idTransaccion());
         resolver.validar(solicitud.institucion(), solicitud.operador());
+        validador.validar(solicitud);
         RecaudacionResponse respuesta = canal.ejecutar(solicitud);
-        LOG.infof("recaudacion completada institucion=%s operador=%s codigo=%s duracionMs=%d",
-            solicitud.institucion(), solicitud.operador(), respuesta.codigo(), milisegundos(inicio));
+        LOG.infof("recaudacion completada institucion=%s operador=%s idTransaccion=%s codigo=%s duracionMs=%d",
+            solicitud.institucion(), solicitud.operador(), solicitud.cabecera().idTransaccion(),
+            respuesta.codigo(), milisegundos(inicio));
         return respuesta;
     }
 

@@ -56,8 +56,8 @@ public class ConveniosWireMockResource implements QuarkusTestResourceLifecycleMa
         propiedades.put("convenio.UNIVCUSCO.url", "http://localhost:" + ucuscoServer.port() + "/mockRecaudosSoapBinding");
         propiedades.put("convenio.YAGANASTE.url", "http://localhost:" + yaganasteServer.port() + "/mockSigmaService");
         propiedades.put("convenio.MUNICIPALIDAD_CUSCO.url",
-            "http://localhost:" + muniCuscoServer.port() + "/api/servicio/recuperar_orden_pago");
-        propiedades.put("convenio.PAYTOPERU.url", "http://localhost:" + payToPeruServer.port() + "/cmac/consulta_pago");
+            "http://localhost:" + muniCuscoServer.port() + "/api/servicio");
+        propiedades.put("convenio.PAYTOPERU.url", "http://localhost:" + payToPeruServer.port() + "/cmac");
         return propiedades;
     }
 
@@ -176,22 +176,35 @@ public class ConveniosWireMockResource implements QuarkusTestResourceLifecycleMa
     }
 
     private void configurarUCusco() {
-        String respuesta = XML_HEADER + "<Envelope><Body><AutoExtornoResponse>"
-            + "<resultado><codigo>00</codigo><mensaje>OK</mensaje></resultado>"
-            + "</AutoExtornoResponse></Body></Envelope>";
+        String respuesta = XML_HEADER + "<Envelope><Body><ConsultarDeudaResponse>"
+            + "<recaudosRs><detalle><respuesta><codigo>0001</codigo>"
+            + "<descripcion>TRANSACCION REALIZADA CON EXITO</descripcion></respuesta>"
+            + "<transaccion><numeroReferenciaDeuda>123456</numeroReferenciaDeuda>"
+            + "<nombreCliente>ALUMNO UAC</nombreCliente><numeroOperacionEmpresa>220009</numeroOperacionEmpresa>"
+            + "<indMasDeuda>0</indMasDeuda><cantidadDocsDeuda>1</cantidadDocsDeuda>"
+            + "<listaDocumentos><documento><numero>T-012-145230</numero>"
+            + "<descripcion>Pago unico</descripcion><fechaEmision>20250928</fechaEmision>"
+            + "<fechaVencimiento>20250928</fechaVencimiento><importeDeuda>150.50</importeDeuda>"
+            + "<importeDeudaMinima>50.00</importeDeudaMinima>"
+            + "<indicadorRestriccPago>0</indicadorRestriccPago>"
+            + "<cantidadSubconceptos>1</cantidadSubconceptos></documento></listaDocumentos>"
+            + "</transaccion></detalle></recaudosRs></ConsultarDeudaResponse></Body></Envelope>";
         ucuscoServer.stubFor(post(urlPathEqualTo("/mockRecaudosSoapBinding"))
-            .withRequestBody(containing("<uac:AutoExtorno>"))
+            .withRequestBody(containing("<uac:ConsultarDeuda>"))
             .willReturn(aResponse().withStatus(200)
                 .withHeader("Content-Type", "text/xml; charset=utf-8")
                 .withBody(respuesta)));
     }
 
     private void configurarYaGanaste() {
-        String respuesta = XML_HEADER + "<Envelope><Body><echoResponse>"
-            + "<codigo>00</codigo><mensaje>OK</mensaje>"
-            + "</echoResponse></Body></Envelope>";
+        String respuesta = XML_HEADER + "<Envelope><Body><consultaResponse>"
+            + "<response><responseCode>00</responseCode>"
+            + "<refOperador>REF-OP-1</refOperador><referenciaSigma>REF-PROV-1</referenciaSigma>"
+            + "<importe>10.00</importe><estadoVenta>OK</estadoVenta>"
+            + "<parametros><indice>1</indice><valor>CONSUH2H</valor></parametros>"
+            + "</response></consultaResponse></Body></Envelope>";
         yaganasteServer.stubFor(post(urlPathEqualTo("/mockSigmaService"))
-            .withRequestBody(containing("<net:echo>"))
+            .withRequestBody(containing("<net:consulta>"))
             .willReturn(aResponse().withStatus(200)
                 .withHeader("Content-Type", "text/xml; charset=utf-8")
                 .withBody(respuesta)));

@@ -4,7 +4,9 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 import org.canalesCMAC.adapter.out.soap.NodoXml;
@@ -16,6 +18,7 @@ import org.canalesCMAC.application.port.RespuestaCruda;
 import org.canalesCMAC.domain.exception.OperadorNoSoportadoException;
 import org.canalesCMAC.domain.model.Canonico;
 import org.canalesCMAC.domain.model.Institucion;
+import org.canalesCMAC.domain.model.Mapas;
 import org.canalesCMAC.domain.model.Operador;
 import org.canalesCMAC.domain.model.RecaudacionRequest;
 import org.canalesCMAC.domain.model.RecaudacionResponse;
@@ -64,9 +67,16 @@ public class ElseSoapMessageCodec implements MapeadorOperacion {
         NodoXml raiz = SoapSupport.cuerpo(respuesta.cuerpo());
         String codigo = mapeoCodigo(operacion, raiz);
         String mensaje = catalogo.mensaje(Institucion.ELSE, codigo, mapeoMensaje(operacion, raiz));
-        Map<String, Object> datos = "00".equals(codigo) ? mapearDatos(operacion, raiz) : Map.of();
+        Map<String, Object> cliente = Mapas.nuevo();
+        List<Map<String, Object>> transaccion = List.of();
+        if ("00".equals(codigo)) {
+            Map<String, Object> datos = mapearDatos(operacion, raiz);
+            cliente = extraerCliente(datos);
+            transaccion = List.of(datos);
+        }
         LOG.debugf("SOAP ELSE interpretado operador=%s codigo=%s", peticion.operador(), codigo);
-        return new RecaudacionResponse(Institucion.ELSE, peticion.operador(), codigo, mensaje, datos);
+        return RecaudacionResponse.de(Institucion.ELSE, peticion.operador(), peticion.cabecera(),
+            codigo, mensaje, cliente, transaccion);
     }
 
     private String mapeoCodigo(OperacionElse operacion, NodoXml raiz) {
@@ -83,6 +93,17 @@ public class ElseSoapMessageCodec implements MapeadorOperacion {
         Map<String, Object> datos = new LinkedHashMap<>();
         operacion.datos(datos, raiz);
         return datos;
+    }
+
+    private static Map<String, Object> extraerCliente(Map<String, Object> datos) {
+        Map<String, Object> cliente = Mapas.nuevo();
+        for (String clave : Set.of(Canonico.NOMBRE_CLIENTE, Canonico.DIRECCION_CLIENTE,
+            Canonico.DISTRITO_CLIENTE, Canonico.DOCUMENTO_CLIENTE, Canonico.NUMERO_SUMINISTRO)) {
+            if (datos.containsKey(clave)) {
+                cliente.put(clave, datos.remove(clave));
+            }
+        }
+        return cliente;
     }
 
     private static String texto(NodoXml raiz, String nombre) {
@@ -157,10 +178,11 @@ public class ElseSoapMessageCodec implements MapeadorOperacion {
                 poner(d, Canonico.DISTRITO_CLIENTE, texto(raiz, "DistritoCliente"));
                 poner(d, Canonico.DIRECCION_CLIENTE, texto(raiz, "DireccionCliente"));
                 poner(d, Canonico.DOCUMENTO_CLIENTE, texto(raiz, "NumeroDocumento"));
-                poner(d, Canonico.MONTO_PAGAR, decimal(texto(raiz, "MontoAPagarConsulta")));
+                poner(d, Canonico.MONTO, decimal(texto(raiz, "MontoAPagarConsulta")));
                 poner(d, Canonico.FECHA_EMISION, texto(raiz, "FechaEmision"));
                 poner(d, Canonico.FECHA_VENCIMIENTO, texto(raiz, "FechaVencimiento"));
                 poner(d, Canonico.FECHA_VENCIMIENTO_RSP, texto(raiz, "FechaVencimientoRSP"));
+                poner(d, Canonico.FECHA_REGISTRO, texto(raiz, "FechaRegistroConsulta"));
                 poner(d, "detalleConsulta", texto(raiz, "DetalleConsulta"));
             }
         },
@@ -255,7 +277,7 @@ public class ElseSoapMessageCodec implements MapeadorOperacion {
                 poner(d, Canonico.NUMERO_COMPROBANTE, texto(raiz, "CodigoComprobante"));
                 poner(d, Canonico.NUMERO_SUMINISTRO, texto(raiz, "CodigoSuministro"));
                 poner(d, Canonico.MONTO, decimal(texto(raiz, "MontoExtorno")));
-                poner(d, "fechaRegistroExtorno", texto(raiz, "FechaRegistroExtorno"));
+                poner(d, Canonico.FECHA_REGISTRO, texto(raiz, "FechaRegistroExtorno"));
             }
         };
 
@@ -297,7 +319,7 @@ public class ElseSoapMessageCodec implements MapeadorOperacion {
             poner(d, Canonico.NUMERO_COMPROBANTE, texto(raiz, "CodigoComprobante"));
             poner(d, Canonico.NUMERO_SUMINISTRO, texto(raiz, "CodigoSuministro"));
             poner(d, Canonico.MONTO, decimal(texto(raiz, "MontoPago")));
-            poner(d, "fechaRegistroPago", texto(raiz, "FechaRegistroPago"));
+            poner(d, Canonico.FECHA_REGISTRO, texto(raiz, "FechaRegistroPago"));
         }
     }
 }

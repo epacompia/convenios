@@ -61,10 +61,10 @@ class SealIso8583CodecTest {
             new RecaudacionRequest(Institucion.SEAL, Operador.CONSULTA_DEUDA, Map.of()));
         assertEquals("00", respuesta.codigo());
         assertEquals("TRANSACCION CORRECTA", respuesta.mensaje());
-        assertEquals("98787", respuesta.datos().get("contrato"));
-        assertEquals("DELGADO DE VIZCARRA NORA", respuesta.datos().get("nombreCliente"));
-        assertEquals("CALLE NICOLAS DE PIEROLA NRO 117-2", respuesta.datos().get("direccionCliente"));
-        assertEquals(0, new BigDecimal("1500.00").compareTo((BigDecimal) respuesta.datos().get("montoPagar")));
+        assertEquals("98787", respuesta.transacciones().get(0).get("numeroComprobante"));
+        assertEquals("DELGADO DE VIZCARRA NORA", respuesta.cliente().get("nombreCliente"));
+        assertEquals("CALLE NICOLAS DE PIEROLA NRO 117-2", respuesta.cliente().get("direccionCliente"));
+        assertEquals(0, new BigDecimal("1500.00").compareTo((BigDecimal) respuesta.transacciones().get(0).get("monto")));
     }
 
     private String consultaResponse() {

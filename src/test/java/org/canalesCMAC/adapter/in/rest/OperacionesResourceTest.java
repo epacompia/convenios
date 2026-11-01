@@ -18,7 +18,7 @@ class OperacionesResourceTest {
             .when().post("/api/v1/operaciones")
             .then()
             .statusCode(400)
-            .body("codigo", is("ER"));
+            .body("respuesta.codigo", is("ER"));
     }
 
     @Test
@@ -29,6 +29,6 @@ class OperacionesResourceTest {
             .when().post("/api/v1/operaciones")
             .then()
             .statusCode(400)
-            .body("codigo", is("ER"));
+            .body("respuesta.codigo", is("ER"));
     }
 }

@@ -4,6 +4,7 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
@@ -15,6 +16,7 @@ import org.canalesCMAC.application.port.PeticionSalida;
 import org.canalesCMAC.application.port.RespuestaCruda;
 import org.canalesCMAC.domain.model.Canonico;
 import org.canalesCMAC.domain.model.Institucion;
+import org.canalesCMAC.domain.model.Mapas;
 import org.canalesCMAC.domain.model.Operador;
 import org.canalesCMAC.domain.model.RecaudacionRequest;
 import org.canalesCMAC.domain.model.RecaudacionResponse;
@@ -91,9 +93,9 @@ public class SealIso8583Codec implements MapeadorOperacion {
             campos.put(38, padLeft(aprobacion(peticion), 6));
         }
         campos.put(41, padLeft(car, 8));
-        campos.put(42, padLeft(agencia, 15));
+        campos.put(42, padLeft(texto(peticion, Canonico.AGENCIA, agencia), 15));
         campos.put(43, padRight(direccion, 40));
-        campos.put(49, padLeft(moneda, 3));
+        campos.put(49, padLeft(texto(peticion, Canonico.MONEDA, moneda), 3));
         campos.put(121, campo121(peticion));
         LOG.debugf("construyendo ISO8583 SEAL operador=%s mti=%s processingCode=%s",
             peticion.operador(), operacion.mti(), operacion.processingCode());
@@ -108,22 +110,22 @@ public class SealIso8583Codec implements MapeadorOperacion {
             codigo = "99";
         }
         String mensaje = catalogo.mensaje(Institucion.SEAL, codigo, "");
-        Map<String, Object> datos = new LinkedHashMap<>();
+        Map<String, Object> cliente = Mapas.nuevo();
+        Map<String, Object> transaccion = Mapas.nuevo();
         if ("00".equals(codigo)) {
             Map<String, String> privados = subcampos(campos.get(121));
-            poner(datos, Canonico.IDENTIFICADOR_TRANSACCION, recortar(campos.get(11)));
-            poner(datos, Canonico.CODIGO_APROBACION, recortar(campos.get(38)));
-            poner(datos, Canonico.CONTRATO, privados.get("P02"));
-            poner(datos, Canonico.NOMBRE_CLIENTE, privados.get("P04"));
-            if (peticion.operador() == Operador.CONSULTA_DEUDA) {
-                poner(datos, Canonico.MONTO_PAGAR, decimal(campos.get(4)));
-                poner(datos, Canonico.DIRECCION_CLIENTE, privados.get("P05"));
-            } else {
-                poner(datos, Canonico.MONTO, decimal(campos.get(4)));
-            }
+            String contrato = privados.get("P02");
+            Mapas.poner(cliente, Canonico.NOMBRE_CLIENTE, privados.get("P04"));
+            Mapas.poner(cliente, Canonico.DIRECCION_CLIENTE, privados.get("P05"));
+            Mapas.poner(cliente, Canonico.NUMERO_SUMINISTRO, contrato);
+            Mapas.poner(transaccion, Canonico.IDENTIFICADOR_TRANSACCION, recortar(campos.get(11)));
+            Mapas.poner(transaccion, Canonico.CODIGO_APROBACION, recortar(campos.get(38)));
+            Mapas.poner(transaccion, Canonico.NUMERO_COMPROBANTE, contrato);
+            Mapas.poner(transaccion, Canonico.MONTO, decimal(campos.get(4)));
         }
         LOG.debugf("ISO8583 SEAL interpretado operador=%s codigo=%s", peticion.operador(), codigo);
-        return new RecaudacionResponse(Institucion.SEAL, peticion.operador(), codigo, mensaje, datos);
+        return RecaudacionResponse.de(Institucion.SEAL, peticion.operador(), peticion.cabecera(),
+            codigo, mensaje, cliente, transaccion.isEmpty() ? List.of() : List.of(transaccion));
     }
 
     private String ensamblar(String mti, Map<Integer, String> campos) {
@@ -288,6 +290,11 @@ public class SealIso8583Codec implements MapeadorOperacion {
             return LocalDateTime.parse(valor.toString(), DateTimeFormatter.ISO_LOCAL_DATE_TIME);
         }
         return LocalDateTime.now();
+    }
+
+    private String texto(RecaudacionRequest peticion, String clave, String porDefecto) {
+        Object valor = peticion.datos().get(clave);
+        return valor == null || valor.toString().isBlank() ? porDefecto : valor.toString();
     }
 
     private BigDecimal decimal(String valor) {

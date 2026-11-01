@@ -30,6 +30,14 @@ public abstract class HttpProtocoloCliente implements ProtocoloCliente {
     @Override
     public RespuestaCruda ejecutar(Convenio convenio, PeticionSalida peticion) {
         Map<String, Object> encabezados = new HashMap<>(registro.autenticacion(convenio.institucion()).encabezados());
+        String apiKey = registro.apiKey(convenio.institucion());
+        if (apiKey != null && !apiKey.isBlank()) {
+            encabezados.put("ApiKey", apiKey);
+        }
+        String token = registro.token(convenio.institucion());
+        if (token != null && !token.isBlank()) {
+            encabezados.put("Authorization", "Bearer " + token);
+        }
         encabezados.put(Exchange.CONTENT_TYPE, peticion.contentType());
         encabezados.putAll(encabezadosPropios(convenio, peticion));
         String url = endpoint(convenio, peticion);

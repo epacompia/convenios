@@ -18,6 +18,7 @@ import org.canalesCMAC.application.port.RespuestaCruda;
 import org.canalesCMAC.domain.exception.OperadorNoSoportadoException;
 import org.canalesCMAC.domain.model.Canonico;
 import org.canalesCMAC.domain.model.Institucion;
+import org.canalesCMAC.domain.model.Mapas;
 import org.canalesCMAC.domain.model.Operador;
 import org.canalesCMAC.domain.model.RecaudacionRequest;
 import org.canalesCMAC.domain.model.RecaudacionResponse;
@@ -64,29 +65,30 @@ public class ElectroUcayaliConvertidor implements MapeadorOperacion {
             JsonNode nodo = objectMapper.readTree(respuesta.cuerpo());
             String codigo = nodo.path("codigo").asText("99");
             String mensaje = catalogo.mensaje(Institucion.ELECTRO_UCAYALI, codigo, nodo.path("mensaje").asText(""));
-            Map<String, Object> datos = new LinkedHashMap<>();
-            extraerSiExiste(nodo, datos, "nroSumin", Canonico.NUMERO_SUMINISTRO);
-            extraerSiExiste(nodo, datos, "nombreCliente", Canonico.NOMBRE_CLIENTE);
-            extraerSiExiste(nodo, datos, "numOperacionEmpresa", Canonico.NUM_OPERACION);
+            Map<String, Object> cliente = Mapas.nuevo();
+            Mapas.poner(cliente, Canonico.NUMERO_SUMINISTRO, texto(nodo, "nroSumin"));
+            Mapas.poner(cliente, Canonico.NOMBRE_CLIENTE, texto(nodo, "nombreCliente"));
+            Map<String, Object> transaccion = Mapas.nuevo();
+            Mapas.poner(transaccion, Canonico.NUMERO_OPERACION, texto(nodo, "numOperacionEmpresa"));
             if (nodo.hasNonNull("lstdebt")) {
                 List<Map<String, Object>> deudas = new ArrayList<>();
                 for (JsonNode deuda : nodo.get("lstdebt")) {
-                    Map<String, Object> item = new LinkedHashMap<>();
-                    extraerSiExiste(deuda, item, "numFactura", Canonico.NUMERO_COMPROBANTE);
+                    Map<String, Object> item = Mapas.nuevo();
+                    Mapas.poner(item, Canonico.NUMERO_COMPROBANTE, texto(deuda, "numFactura"));
                     if (deuda.hasNonNull("montoDeuda")) {
                         item.put(Canonico.MONTO, deuda.get("montoDeuda").decimalValue());
                     }
-                    extraerSiExiste(deuda, item, "fechaEmision", Canonico.FECHA_EMISION);
-                    extraerSiExiste(deuda, item, "fechaVencimiento", Canonico.FECHA_VENCIMIENTO);
-                    if (deuda.hasNonNull("glosa")) {
-                        item.put("glosa", deuda.get("glosa").asText());
-                    }
+                    Mapas.poner(item, Canonico.FECHA_EMISION, texto(deuda, "fechaEmision"));
+                    Mapas.poner(item, Canonico.FECHA_VENCIMIENTO, texto(deuda, "fechaVencimiento"));
+                    Mapas.poner(item, Canonico.GLOSA, texto(deuda, "glosa"));
+                    Mapas.poner(item, Canonico.TIPO_INTEGRACION, texto(deuda, "tipoIntegracion"));
                     deudas.add(item);
                 }
-                datos.put(Canonico.LISTA_DEUDAS, deudas);
+                transaccion.put(Canonico.DEUDAS, deudas);
             }
             LOG.debugf("REST Electro Ucayali interpretado operador=%s codigo=%s", peticion.operador(), codigo);
-            return new RecaudacionResponse(Institucion.ELECTRO_UCAYALI, peticion.operador(), codigo, mensaje, datos);
+            return RecaudacionResponse.de(Institucion.ELECTRO_UCAYALI, peticion.operador(),
+                peticion.cabecera(), codigo, mensaje, cliente, List.of(transaccion));
         } catch (Exception e) {
             throw new IllegalArgumentException("Respuesta JSON no válida: " + e.getMessage(), e);
         }
@@ -130,6 +132,12 @@ public class ElectroUcayaliConvertidor implements MapeadorOperacion {
         }
     }
 
+    private static String texto(JsonNode nodo, String campo) {
+        return nodo.hasNonNull(campo) && !nodo.get(campo).asText().isBlank()
+            ? nodo.get(campo).asText().trim()
+            : null;
+    }
+
     private enum OperacionEu {
         CONSULTA_DEUDA {
             @Override
@@ -143,7 +151,7 @@ public class ElectroUcayaliConvertidor implements MapeadorOperacion {
                 c.put("traceConsulta", p.datos().getOrDefault(Canonico.TRACE_CONSULTA, "").toString());
                 c.put("fechaConsulta", FECHA_COMPACTA.format(fechaOperacion(p)));
                 c.put("horaConsulta", HORA_COMPACTA.format(fechaOperacion(p)));
-                comunes(c, codEmpresa);
+                comunes(c, codEmpresa, p);
             }
         },
         PAGO_DEUDA {
@@ -160,7 +168,7 @@ public class ElectroUcayaliConvertidor implements MapeadorOperacion {
                 c.put("fechaPago", FECHA_COMPACTA.format(fechaOperacion(p)));
                 c.put("horaPago", HORA_COMPACTA.format(fechaOperacion(p)));
                 c.put("montoDeuda", monto(p));
-                comunes(c, codEmpresa);
+                comunes(c, codEmpresa, p);
             }
         },
         EXTORNO_PAGO {
@@ -177,7 +185,7 @@ public class ElectroUcayaliConvertidor implements MapeadorOperacion {
                 c.put("fechaPago", FECHA_COMPACTA.format(fechaOperacion(p)));
                 c.put("horaPago", HORA_COMPACTA.format(fechaOperacion(p)));
                 c.put("montoDeuda", monto(p));
-                comunes(c, codEmpresa);
+                comunes(c, codEmpresa, p);
             }
         },
         EXTORNO_PAGO_AUTO {
@@ -193,7 +201,7 @@ public class ElectroUcayaliConvertidor implements MapeadorOperacion {
                 c.put("fechaPago", FECHA_COMPACTA.format(fechaOperacion(p)));
                 c.put("horaPago", HORA_COMPACTA.format(fechaOperacion(p)));
                 c.put("montoDeuda", monto(p));
-                comunes(c, codEmpresa);
+                comunes(c, codEmpresa, p);
             }
         },
         EXTORNO_AUTO {
@@ -210,7 +218,7 @@ public class ElectroUcayaliConvertidor implements MapeadorOperacion {
                 c.put("fechaPago", FECHA_COMPACTA.format(fechaOperacion(p)));
                 c.put("horaPago", HORA_COMPACTA.format(fechaOperacion(p)));
                 c.put("montoDeuda", monto(p));
-                comunes(c, codEmpresa);
+                comunes(c, codEmpresa, p);
             }
         };
 
@@ -227,12 +235,12 @@ public class ElectroUcayaliConvertidor implements MapeadorOperacion {
             throw new OperadorNoSoportadoException("Operador " + operador + " no soportado por Electro Ucayali");
         }
 
-        private static void comunes(Map<String, Object> c, String codEmpresa) {
+        private static void comunes(Map<String, Object> c, String codEmpresa, RecaudacionRequest p) {
             c.put("codEmpresa", codEmpresa);
-            c.put("codServicio", "0");
-            c.put("codAgencia", "0");
-            c.put("codCanal", "00");
-            c.put("terminal", "0");
+            c.put("codServicio", p.datos().getOrDefault("codServicio", "0").toString());
+            c.put("codAgencia", p.datos().getOrDefault(Canonico.AGENCIA, "0").toString());
+            c.put("codCanal", p.datos().getOrDefault(Canonico.CANAL, "00").toString());
+            c.put("terminal", p.datos().getOrDefault("terminal", "0").toString());
         }
     }
 }

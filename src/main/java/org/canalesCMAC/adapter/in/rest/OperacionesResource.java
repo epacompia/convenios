@@ -17,10 +17,14 @@ public class OperacionesResource {
     @Inject
     RecaudacionUseCase useCase;
 
+    @Inject
+    SolicitudContexto contexto;
+
     @POST
     @Consumes(MediaType.APPLICATION_JSON)
     @Produces(MediaType.APPLICATION_JSON)
     public RecaudacionResponse procesar(RecaudacionRequest solicitud) {
+        contexto.establecer(solicitud);
         return useCase.procesar(solicitud);
     }
 }

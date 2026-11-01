@@ -51,8 +51,8 @@ class ElseSoapMessageCodecTest {
             new RecaudacionRequest(Institucion.ELSE, Operador.CONSULTA_DEUDA, Map.of()));
         assertEquals("00", respuesta.codigo());
         assertEquals("CORRECTO", respuesta.mensaje());
-        assertEquals("647A5DEC-242A-4FC9-83A0-775A096080B1", respuesta.datos().get("identificadorTransaccion"));
-        assertEquals("PAUCAR LOAYZA ANA", respuesta.datos().get("nombreCliente"));
-        assertEquals(0, new BigDecimal("23.10").compareTo((BigDecimal) respuesta.datos().get("montoPagar")));
+        assertEquals("647A5DEC-242A-4FC9-83A0-775A096080B1", respuesta.transacciones().get(0).get("identificadorTransaccion"));
+        assertEquals("PAUCAR LOAYZA ANA", respuesta.cliente().get("nombreCliente"));
+        assertEquals(0, new BigDecimal("23.10").compareTo((BigDecimal) respuesta.transacciones().get(0).get("monto")));
     }
 }

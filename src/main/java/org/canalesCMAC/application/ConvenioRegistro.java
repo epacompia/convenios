@@ -32,6 +32,8 @@ public class ConvenioRegistro {
     private final Map<Institucion, String> protocolos;
     private final Map<Institucion, String> autenticaciones;
     private final Map<Institucion, String> urls;
+    private final Map<Institucion, String> tokens;
+    private final Map<Institucion, String> apiKeys;
     private final Map<Institucion, Integer> reintentos;
     private final Map<Institucion, Long> reintentosDelay;
     private final Map<Institucion, Long> timeouts;
@@ -46,6 +48,8 @@ public class ConvenioRegistro {
         this.protocolos = parsearValores(config, "protocolo");
         this.autenticaciones = parsearValores(config, "auth");
         this.urls = parsearValores(config, "url");
+        this.tokens = parsearValores(config, "token");
+        this.apiKeys = parsearValores(config, "apikey");
         this.reintentos = parsearEnteros(config, "reintentos");
         this.reintentosDelay = parsearLargos(config, "reintentos.delay");
         this.timeouts = parsearLargos(config, "timeout");
@@ -64,6 +68,8 @@ public class ConvenioRegistro {
         this.protocolos = protocolos;
         this.autenticaciones = Map.of();
         this.urls = Map.of();
+        this.tokens = Map.of();
+        this.apiKeys = Map.of();
         this.reintentos = Map.of();
         this.reintentosDelay = Map.of();
         this.timeouts = Map.of();
@@ -96,6 +102,14 @@ public class ConvenioRegistro {
 
     public String url(Institucion institucion) {
         return urls.getOrDefault(institucion, "");
+    }
+
+    public String token(Institucion institucion) {
+        return tokens.getOrDefault(institucion, "");
+    }
+
+    public String apiKey(Institucion institucion) {
+        return apiKeys.getOrDefault(institucion, "");
     }
 
     public int reintentos(Institucion institucion) {
@@ -158,7 +172,9 @@ public class ConvenioRegistro {
             }
             Institucion institucion = institucion(propiedad);
             if (institucion != null) {
-                resultado.put(institucion, config.getValue(propiedad, String.class));
+                config.getOptionalValue(propiedad, String.class)
+                    .filter(valor -> !valor.isBlank())
+                    .ifPresent(valor -> resultado.put(institucion, valor));
             }
         }
         return resultado;

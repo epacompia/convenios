@@ -44,8 +44,8 @@ class ElectroUcayaliConvertidorTest {
         RecaudacionResponse respuesta = convertidor.interpretar(new RespuestaCruda(200, json),
             new RecaudacionRequest(Institucion.ELECTRO_UCAYALI, Operador.CONSULTA_DEUDA, Map.of()));
         assertEquals("00", respuesta.codigo());
-        assertEquals("JAMEN AGRO FOREST S.A.", respuesta.datos().get("nombreCliente"));
-        List<?> deudas = (List<?>) respuesta.datos().get("listaDeudas");
+        assertEquals("JAMEN AGRO FOREST S.A.", respuesta.cliente().get("nombreCliente"));
+        List<?> deudas = (List<?>) respuesta.transacciones().get(0).get("deudas");
         assertEquals(1, deudas.size());
         Map<?, ?> primera = (Map<?, ?>) deudas.get(0);
         assertEquals("201800100000", primera.get("numeroComprobante"));

@@ -1,7 +1,9 @@
 package org.canalesCMAC.application;
 
+import java.util.ArrayList;
 import java.util.EnumMap;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 import org.canalesCMAC.application.port.MapeadorOperacion;
@@ -55,6 +57,17 @@ public class ConvenioOrquestador {
     }
 
     public RecaudacionResponse procesar(RecaudacionRequest peticion) {
+        if (peticion.datos().transacciones().size() > 1) {
+            List<RecaudacionResponse> respuestas = new ArrayList<>();
+            for (Map<String, Object> transaccion : peticion.datos().transacciones()) {
+                respuestas.add(procesarUna(peticion.conTransaccion(transaccion)));
+            }
+            return combinar(peticion, respuestas);
+        }
+        return procesarUna(peticion);
+    }
+
+    private RecaudacionResponse procesarUna(RecaudacionRequest peticion) {
         Convenio convenio = registro.convenio(peticion.institucion());
         if (convenio == null) {
             throw new InstitucionNoSoportadaException("Institución no soportada: " + peticion.institucion());
@@ -68,12 +81,14 @@ public class ConvenioOrquestador {
             throw new InstitucionNoSoportadaException(
                 "Sin cliente para el protocolo " + convenio.protocolo() + " de " + peticion.institucion());
         }
-        LOG.debugf("orquestando institucion=%s operador=%s protocolo=%s",
-            peticion.institucion(), peticion.operador(), convenio.protocolo());
+        LOG.debugf("orquestando institucion=%s operador=%s protocolo=%s idTransaccion=%s",
+            peticion.institucion(), peticion.operador(), convenio.protocolo(),
+            peticion.cabecera().idTransaccion());
         PeticionSalida salida = mapeador.construir(peticion);
         RespuestaCruda respuesta = cliente.ejecutar(convenio, salida);
         try {
-            return mapeador.interpretar(respuesta, peticion);
+            RecaudacionResponse interpretada = mapeador.interpretar(respuesta, peticion);
+            return conCabecera(interpretada, peticion);
         } catch (ProveedorException excepcion) {
             throw excepcion;
         } catch (RuntimeException excepcion) {
@@ -81,5 +96,36 @@ public class ConvenioOrquestador {
                 "Respuesta inválida de " + peticion.institucion() + ": " + excepcion.getMessage(),
                 ProveedorException.BAD_GATEWAY, false, excepcion);
         }
+    }
+
+    private RecaudacionResponse conCabecera(RecaudacionResponse respuesta, RecaudacionRequest peticion) {
+        if (respuesta.cabecera() != null) {
+            return respuesta;
+        }
+        return new RecaudacionResponse(respuesta.institucion(), respuesta.operador(),
+            peticion.cabecera(), respuesta.respuesta());
+    }
+
+    private RecaudacionResponse combinar(RecaudacionRequest peticion, List<RecaudacionResponse> respuestas) {
+        String codigo = respuestas.stream()
+            .map(RecaudacionResponse::codigo)
+            .filter(codigoRespuesta -> !"00".equals(codigoRespuesta))
+            .findFirst()
+            .orElse("00");
+        String mensaje = respuestas.stream()
+            .filter(respuesta -> !"00".equals(respuesta.codigo()))
+            .map(RecaudacionResponse::mensaje)
+            .findFirst()
+            .orElse("OK");
+        Map<String, Object> cliente = respuestas.stream()
+            .map(RecaudacionResponse::cliente)
+            .filter(datosCliente -> datosCliente != null && !datosCliente.isEmpty())
+            .findFirst()
+            .orElse(Map.of());
+        List<Map<String, Object>> transaccion = respuestas.stream()
+            .flatMap(respuesta -> respuesta.transacciones().stream())
+            .toList();
+        return RecaudacionResponse.de(peticion.institucion(), peticion.operador(),
+            peticion.cabecera(), codigo, mensaje, cliente, transaccion);
     }
 }

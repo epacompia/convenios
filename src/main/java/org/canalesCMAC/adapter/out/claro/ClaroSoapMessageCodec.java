@@ -2,6 +2,7 @@ package org.canalesCMAC.adapter.out.claro;
 
 import java.math.BigDecimal;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
 import jakarta.enterprise.context.ApplicationScoped;
@@ -11,6 +12,7 @@ import org.canalesCMAC.application.port.PeticionSalida;
 import org.canalesCMAC.application.port.RespuestaCruda;
 import org.canalesCMAC.domain.model.Canonico;
 import org.canalesCMAC.domain.model.Institucion;
+import org.canalesCMAC.domain.model.Mapas;
 import org.canalesCMAC.domain.model.RecaudacionRequest;
 import org.canalesCMAC.domain.model.RecaudacionResponse;
 import org.jboss.logging.Logger;
@@ -79,16 +81,17 @@ public class ClaroSoapMessageCodec implements MapeadorOperacion {
 
         poner(campos, "binAdquiriente", peticion, "binAdquiriente");
         poner(campos, "binAdquirienteReenvia", peticion, "binAdquirienteReenvia");
-        poner(campos, "canal", peticion, "canal");
+        poner(campos, "canal", peticion, Canonico.CANAL);
         poner(campos, "codigoMoneda", peticion, "codigoMoneda");
         poner(campos, "fechaCaptura", peticion, "fechaCaptura");
-        poner(campos, "fechaTransaccion", peticion, "fechaTransaccion");
+        poner(campos, "fechaTransaccion", peticion, Canonico.FECHA_OPERACION);
         poner(campos, "mac", peticion, "mac");
         poner(campos, "nombreComercio", peticion, "nombreComercio");
         poner(campos, "numeroComercio", peticion, "numeroComercio");
         poner(campos, "numeroReferencia", peticion, "numeroReferencia");
         poner(campos, "numeroTerminal", peticion, "numeroTerminal");
-        poner(campos, "trace", peticion, "trace");
+        poner(campos, "trace", peticion, Canonico.IDENTIFICADOR_TRANSACCION);
+        poner(campos, "numeroSuministro", peticion, Canonico.NUMERO_SUMINISTRO);
         poner(campos, "cuentaDestino", peticion, "cuentaDestino");
         poner(campos, "cuentaOrigen", peticion, "cuentaOrigen");
         poner(campos, "fechaExpiracionTarjeta", peticion, "fechaExpiracionTarjeta");
@@ -96,7 +99,7 @@ public class ClaroSoapMessageCodec implements MapeadorOperacion {
         poner(campos, "pinblock", peticion, "pinblock");
         poner(campos, "track2Data", peticion, "track2Data");
         poner(campos, "acreedor", peticion, "acreedor");
-        poner(campos, "agencia", peticion, "agencia");
+        poner(campos, "agencia", peticion, Canonico.AGENCIA);
         poner(campos, "ciudad", peticion, "ciudad");
         poner(campos, "codigoFormato", peticion, "codigoFormato");
         poner(campos, "codigoMedioPago", peticion, "codigoMedioPago");
@@ -160,12 +163,19 @@ public class ClaroSoapMessageCodec implements MapeadorOperacion {
             LOG.errorf("respuesta CLARO inválida: %s", e.getMessage());
         }
 
-        return new RecaudacionResponse(
+        Map<String, Object> cliente = Mapas.nuevo();
+        Map<String, Object> transaccion = Mapas.nuevo();
+        Mapas.poner(transaccion, Canonico.CODIGO_APROBACION, codigoAutorizacion);
+        String mensaje = "00".equals(codigoRespuesta) ? "OK" : codigoRespuesta;
+
+        return RecaudacionResponse.de(
             Institucion.CLARO,
             peticion.operador(),
+            peticion.cabecera(),
             codigoRespuesta,
-            codigoAutorizacion,
-            Map.of()
+            mensaje,
+            cliente,
+            transaccion.isEmpty() ? List.of() : List.of(transaccion)
         );
     }
 }
