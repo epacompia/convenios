@@ -1,0 +1,171 @@
+{
+	"info": {
+		"_postman_id": "d1c5c20a-e728-453a-9bb0-8e2880e887da",
+		"name": "UNSAAC",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "Consulta deuda",
+			"protocolProfileBehavior": {
+				"disabledSystemHeaders": {}
+			},
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "urlencoded",
+					"urlencoded": [
+						{
+							"key": "codigo_transaccion",
+							"value": "U2FsdGVkX1+NNvaNFtZYXQOWpv/638O0lD5wIHwfVsw=",
+							"type": "text"
+						}
+					],
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "https://servicios.unsaac.edu.pe/demo-recaudacion/SRVPPConsultaDetallePagoCC",
+					"protocol": "https",
+					"host": [
+						"servicios",
+						"unsaac",
+						"edu",
+						"pe"
+					],
+					"path": [
+						"demo-recaudacion",
+						"SRVPPConsultaDetallePagoCC"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Pago deuda",
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "urlencoded",
+					"urlencoded": [
+						{
+							"key": "pago",
+							"value": "U2FsdGVkX1+CdLUUACrr1IwGYQBZYddTacaYpgV1S2FOVOJ9bZQo6MuUuWATysKYNKfVCVJgn0E+Tmb86q7ABzs/HSdIFPBT8X4jwdsEB6Dc7gfo0Fi2+GC3ECUg9AkIlxbaQsebuTzmPj0TdisjkCyqYmCj9wkeOX4O9awtKhTpfMFmFi5ZwrgLWHlieZSgXaR/bfoFv85tWD2F90N7QDDKcqN9SrQHyAwalTr73PBh2fyr2h7RI1qSNLXmcxvGuReL7ZOCqaMGg4LZsStNO4YL7qTZm29bET/ieIKQF1QpTBXBFF05EOL3oSoYMwG/K3CHHaCwxO9bk4H98ECW0T7Lffj/j3w2oJRd21LFgP+EmqACs/d6P7OUsgQXdAMdR/ePppfHihMvfmazRJvL4WlzQAmZSDXUy+WArPahDYO+uwTVtOfvL/iN+9AgxranFFtfMoUWOOCnvb6hYGh57go90EJCWdxymrgmQ1O0rwQ=",
+							"type": "text"
+						}
+					],
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "http://servicios.unsaac.edu.pe/demo-recaudacion/SRVPPGuardarPagoCC",
+					"protocol": "http",
+					"host": [
+						"servicios",
+						"unsaac",
+						"edu",
+						"pe"
+					],
+					"path": [
+						"demo-recaudacion",
+						"SRVPPGuardarPagoCC"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Verificar deuda",
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "urlencoded",
+					"urlencoded": [
+						{
+							"key": "ccodigos_transaccion",
+							"value": "U2FsdGVkX1/03HSmi2P+Uq1Jjq2YqqcRbHyZXAarXgVMqO1lSSmLYxlWZXIbch+1",
+							"type": "text"
+						}
+					],
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "https://servicios.unsaac.edu.pe/demo-recaudacion/SRVPPVerificarPagoCC",
+					"protocol": "https",
+					"host": [
+						"servicios",
+						"unsaac",
+						"edu",
+						"pe"
+					],
+					"path": [
+						"demo-recaudacion",
+						"SRVPPVerificarPagoCC"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Confirmar pago",
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "urlencoded",
+					"urlencoded": [
+						{
+							"key": "codigo_transaccion",
+							"value": "U2FsdGVkX1/03HSmi2P+Uq1Jjq2YqqcRbHyZXAarXgVMqO1lSSmLYxlWZXIbch+1",
+							"type": "text"
+						},
+						{
+							"key": "exito",
+							"value": "true",
+							"type": "text"
+						},
+						{
+							"key": "numero_operacion",
+							"value": "V-000000000913999",
+							"type": "text"
+						}
+					],
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "https://servicios.unsaac.edu.pe/demo-recaudacion/SRVPPConfirmarPagoCC",
+					"protocol": "https",
+					"host": [
+						"servicios",
+						"unsaac",
+						"edu",
+						"pe"
+					],
+					"path": [
+						"demo-recaudacion",
+						"SRVPPConfirmarPagoCC"
+					]
+				}
+			},
+			"response": []
+		}
+	],
+	"protocolProfileBehavior": {}
+}
