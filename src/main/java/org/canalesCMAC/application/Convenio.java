@@ -13,4 +13,8 @@ public record Convenio(
     int reintentos,
     long reintentosDelay,
     long timeout) {
+
+    public Convenio sinReintentos() {
+        return new Convenio(institucion, protocolo, url, operadores, 0, reintentosDelay, timeout);
+    }
 }

@@ -5,9 +5,9 @@ import java.time.OffsetDateTime;
 import org.canalesCMAC.domain.model.RecaudacionRequest;
 import org.jboss.logging.Logger;
 
+import io.quarkus.narayana.jta.QuarkusTransaction;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
-import jakarta.transaction.Transactional;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 
 @ApplicationScoped
@@ -27,7 +27,6 @@ public class RegistroIntentoProveedor {
     @ConfigProperty(name = "recaudacion.intentos.enabled", defaultValue = "true")
     boolean habilitado;
 
-    @Transactional
     public void registrar(String idTransaccion,
                           String institucion,
                           String operador,
@@ -45,6 +44,28 @@ public class RegistroIntentoProveedor {
             return;
         }
         try {
+            QuarkusTransaction.requiringNew().run(() -> persistir(idTransaccion, institucion,
+                operador, protocolo, endpoint, intento, httpStatus, codigoError, mensajeError,
+                duracionMs, circuitBreakerEstado, solicitud, responseJson));
+        } catch (RuntimeException e) {
+            LOG.warnf("no se pudo registrar intento de proveedor idTransaccion=%s: %s",
+                idTransaccion, e.getMessage());
+        }
+    }
+
+    private void persistir(String idTransaccion,
+                           String institucion,
+                           String operador,
+                           String protocolo,
+                           String endpoint,
+                           int intento,
+                           Integer httpStatus,
+                           String codigoError,
+                           String mensajeError,
+                           long duracionMs,
+                           String circuitBreakerEstado,
+                           RecaudacionRequest solicitud,
+                           String responseJson) {
             RecaudacionIntentoProveedor entidad = new RecaudacionIntentoProveedor();
             entidad.idTransaccion = idTransaccion;
             entidad.convenioId = convenios.porCodigo(institucion)
@@ -64,9 +85,5 @@ public class RegistroIntentoProveedor {
             entidad.responseJson = sanitizador.sanitizarJsonTexto(responseJson);
             entidad.fechaIntento = OffsetDateTime.now();
             repositorio.persist(entidad);
-        } catch (RuntimeException e) {
-            LOG.warnf("no se pudo registrar intento de proveedor idTransaccion=%s: %s",
-                idTransaccion, e.getMessage());
-        }
     }
 }

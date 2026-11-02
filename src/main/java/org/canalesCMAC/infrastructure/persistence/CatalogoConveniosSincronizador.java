@@ -1,5 +1,8 @@
 package org.canalesCMAC.infrastructure.persistence;
 
+import java.util.Set;
+import java.util.stream.Collectors;
+
 import org.canalesCMAC.application.ConvenioRegistro;
 import org.canalesCMAC.domain.model.Institucion;
 import org.canalesCMAC.domain.model.Operador;
@@ -62,10 +65,43 @@ public class CatalogoConveniosSincronizador {
                     }
                 }
             }
+            desactivarNoConfigurados();
             LOG.infof("catálogo de convenios sincronizado instituciones=%d",
                 registro.instituciones().size());
         } catch (RuntimeException e) {
             LOG.errorf("no se pudo sincronizar el catálogo de convenios: %s", e.getMessage());
+        }
+    }
+
+    private void desactivarNoConfigurados() {
+        Set<String> configurados = registro.instituciones().stream()
+            .map(Institucion::name)
+            .collect(Collectors.toSet());
+        for (Convenio convenio : convenios.listAll()) {
+            if (!configurados.contains(convenio.codigo)) {
+                convenio.activo = false;
+                continue;
+            }
+            Institucion institucion;
+            try {
+                institucion = Institucion.desde(convenio.codigo);
+            } catch (RuntimeException e) {
+                convenio.activo = false;
+                continue;
+            }
+            if (institucion == null) {
+                convenio.activo = false;
+                continue;
+            }
+            Set<String> operadoresConfigurados = registro
+                .operadores(institucion).stream()
+                .map(Operador::name)
+                .collect(Collectors.toSet());
+            for (ConvenioOperador relacion : operadores.porConvenio(convenio.id)) {
+                if (!operadoresConfigurados.contains(relacion.operador)) {
+                    relacion.activo = false;
+                }
+            }
         }
     }
 }

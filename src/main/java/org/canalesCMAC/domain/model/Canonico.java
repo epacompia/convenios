@@ -49,7 +49,6 @@ public final class Canonico {
     public static final String NUMERO_TRACE = "numeroTrace";
     public static final String NUMERO_OPERACION_ORIGINAL = "numeroOperacionOriginal";
     public static final String MONTO = "monto";
-    public static final String MONTO_PAGAR = "montoPagar";
     public static final String FECHA_OPERACION = "fechaOperacion";
     public static final String HORA_OPERACION = "horaOperacion";
     public static final String FECHA_OPERACION_ORIGINAL = "fechaOperacionOriginal";

@@ -14,6 +14,7 @@ import org.canalesCMAC.application.port.MapeadorOperacion;
 import org.canalesCMAC.application.port.PeticionSalida;
 import org.canalesCMAC.application.port.RespuestaCruda;
 import org.canalesCMAC.domain.exception.OperadorNoSoportadoException;
+import org.canalesCMAC.domain.exception.ProveedorException;
 import org.canalesCMAC.domain.model.Canonico;
 import org.canalesCMAC.domain.model.Institucion;
 import org.canalesCMAC.domain.model.Mapas;
@@ -94,6 +95,12 @@ public class PayToPeruCodec implements MapeadorOperacion {
                 );
             }
 
+            if (!root.isObject()
+                || (!root.has("berror") && !root.has("cmensaje") && !root.has("ncodigo_pago"))) {
+                throw new ProveedorException(
+                    "Respuesta de PAYTOPERU sin estructura reconocible",
+                    ProveedorException.BAD_GATEWAY, false, null);
+            }
             String codigo = root.path("berror").asBoolean() ? "01" : "00";
             String mensaje = texto(root, "cmensaje");
             return RecaudacionResponse.de(

@@ -253,6 +253,18 @@ class OperacionesE2eTest {
     }
 
     @Test
+    void aceptaAliasOrdenPagoDelContratoAnterior() {
+        given()
+            .contentType(ContentType.JSON)
+            .body("{\"institucion\":\"MUNICIPALIDAD_CUSCO\",\"operador\":\"RECUPERAR_ORDEN_PAGO\","
+                + "\"datos\":{\"filtro\":{\"ordenpago\":\"123\"}}}")
+            .when().post("/api/v1/operaciones")
+            .then()
+            .statusCode(200)
+            .body("respuesta.codigo", is("00"));
+    }
+
+    @Test
     void payToPeruConsultaPagoFlujoCompleto() {
         given()
             .contentType(ContentType.JSON)

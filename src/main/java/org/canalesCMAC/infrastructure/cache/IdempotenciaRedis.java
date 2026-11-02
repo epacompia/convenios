@@ -11,11 +11,6 @@ import jakarta.enterprise.inject.Instance;
 import jakarta.inject.Inject;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 
-/**
- * Idempotencia de operaciones usando Redis.
- *
- * <p>Si está deshabilitada, el flujo continúa sin cachear ni bloquear.</p>
- */
 @ApplicationScoped
 public class IdempotenciaRedis {
 
@@ -35,7 +30,7 @@ public class IdempotenciaRedis {
         return habilitada;
     }
 
-    public Optional<String> buscar(String idTransaccion) {
+    public Optional<String> buscar(String clave) {
         if (!habilitada) {
             return Optional.empty();
         }
@@ -44,16 +39,30 @@ public class IdempotenciaRedis {
             return Optional.empty();
         }
         try {
-            Response respuesta = redis.get(clave(idTransaccion));
+            Response respuesta = redis.get(clave(clave));
             return respuesta == null ? Optional.empty() : Optional.of(respuesta.toString());
         } catch (RuntimeException e) {
-            LOG.warnf("no se pudo leer idempotencia idTransaccion=%s: %s",
-                idTransaccion, e.getMessage());
+            LOG.warnf("no se pudo leer idempotencia clave=%s: %s", clave, e.getMessage());
             return Optional.empty();
         }
     }
 
-    public void guardar(String idTransaccion, String respuestaJson) {
+    public void guardar(String clave, String respuestaJson) {
+        if (!habilitada || respuestaJson == null) {
+            return;
+        }
+        RedisClient redis = redis();
+        if (redis == null) {
+            return;
+        }
+        try {
+            redis.setex(clave(clave), String.valueOf(ttlSegundos), respuestaJson);
+        } catch (RuntimeException e) {
+            LOG.warnf("no se pudo guardar idempotencia clave=%s: %s", clave, e.getMessage());
+        }
+    }
+
+    public void eliminar(String clave) {
         if (!habilitada) {
             return;
         }
@@ -62,10 +71,9 @@ public class IdempotenciaRedis {
             return;
         }
         try {
-            redis.setex(clave(idTransaccion), String.valueOf(ttlSegundos), respuestaJson);
+            redis.del(java.util.List.of(clave(clave)));
         } catch (RuntimeException e) {
-            LOG.warnf("no se pudo guardar idempotencia idTransaccion=%s: %s",
-                idTransaccion, e.getMessage());
+            LOG.warnf("no se pudo eliminar idempotencia clave=%s: %s", clave, e.getMessage());
         }
     }
 
@@ -81,7 +89,7 @@ public class IdempotenciaRedis {
         }
     }
 
-    private String clave(String idTransaccion) {
-        return PREFIJO + idTransaccion;
+    private String clave(String clave) {
+        return PREFIJO + clave;
     }
 }

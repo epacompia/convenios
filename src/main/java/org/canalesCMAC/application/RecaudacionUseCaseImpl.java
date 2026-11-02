@@ -1,8 +1,15 @@
 package org.canalesCMAC.application;
 
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.HexFormat;
+import java.util.Map;
 import java.util.Optional;
 
 import org.canalesCMAC.application.port.RecaudacionChannel;
+import org.canalesCMAC.domain.exception.ConflictoIdempotenciaException;
+import org.canalesCMAC.domain.exception.OperacionEnProcesoException;
 import org.canalesCMAC.domain.model.RecaudacionRequest;
 import org.canalesCMAC.domain.model.RecaudacionResponse;
 import org.canalesCMAC.infrastructure.cache.IdempotenciaRedis;
@@ -62,52 +69,111 @@ public class RecaudacionUseCaseImpl implements RecaudacionUseCase {
             resolver.validar(solicitud.institucion(), solicitud.operador());
             validador.validar(solicitud);
 
-            if (idempotencia.habilitada()) {
-                Optional<String> cache = idempotencia.buscar(idTransaccion);
-                if (cache.isPresent()) {
-                    try {
-                        LOG.infof("recaudacion idempotente idTransaccion=%s", idTransaccion);
-                        return objectMapper.readValue(cache.get(), RecaudacionResponse.class);
-                    } catch (JsonProcessingException e) {
-                        LOG.warnf("cache de idempotencia inválida idTransaccion=%s: %s",
-                            idTransaccion, e.getMessage());
+            String hash = hash(solicitud);
+            String clave = clave(solicitud, hash);
+            Optional<String> cache = idempotencia.buscar(clave);
+            if (cache.isPresent()) {
+                RecaudacionResponse recuperada = leer(cache.get());
+                if (recuperada != null) {
+                    LOG.infof("recaudacion idempotente en redis idTransaccion=%s", idTransaccion);
+                    return recuperada;
+                }
+            }
+
+            Optional<RecaudacionIdempotencia> durable =
+                idempotenciaDurable.buscar(idTransaccion);
+            if (durable.isPresent()) {
+                RecaudacionIdempotencia registro = durable.get();
+                if (registro.hashRequest != null && !registro.hashRequest.equals(hash)) {
+                    throw new ConflictoIdempotenciaException(
+                        "idTransaccion ya fue usada con otro payload");
+                }
+                if ("COMPLETADA".equals(registro.estado) && registro.responseJson != null) {
+                    RecaudacionResponse recuperada = leer(registro.responseJson);
+                    if (recuperada != null) {
+                        idempotencia.guardar(clave, registro.responseJson);
+                        LOG.infof("recaudacion idempotente durable idTransaccion=%s", idTransaccion);
+                        return recuperada;
+                    }
+                    idempotenciaDurable.marcarError(idTransaccion);
+                } else if ("EN_PROCESO".equals(registro.estado)) {
+                    throw new OperacionEnProcesoException(
+                        "La operación con idTransaccion " + idTransaccion + " está en proceso");
+                }
+            }
+
+            boolean reservado = idempotenciaDurable.reservar(
+                idTransaccion, institucion, operador, hash);
+            if (!reservado) {
+                Optional<RecaudacionIdempotencia> otra =
+                    idempotenciaDurable.buscar(idTransaccion);
+                if (otra.isPresent() && "COMPLETADA".equals(otra.get().estado)
+                    && otra.get().responseJson != null) {
+                    RecaudacionResponse recuperada = leer(otra.get().responseJson);
+                    if (recuperada != null) {
+                        idempotencia.guardar(clave, otra.get().responseJson);
+                        return recuperada;
                     }
                 }
+                throw new OperacionEnProcesoException(
+                    "La operación con idTransaccion " + idTransaccion + " está en proceso");
             }
 
-            Optional<RecaudacionIdempotencia> durable = idempotenciaDurable.buscar(idTransaccion);
-            if (durable.isPresent()
-                && "OK".equals(durable.get().estado)
-                && durable.get().responseJson != null) {
-                try {
-                    return objectMapper.readValue(durable.get().responseJson, RecaudacionResponse.class);
-                } catch (JsonProcessingException e) {
-                    LOG.warnf("idempotencia durable inválida idTransaccion=%s: %s",
-                        idTransaccion, e.getMessage());
+            try {
+                RecaudacionResponse respuesta = canal.ejecutar(solicitud);
+                String responseJson = serializar(respuesta);
+                if (responseJson == null) {
+                    responseJson = serializar(RecaudacionResponse.error(
+                        solicitud.institucion(), solicitud.operador(), solicitud.cabecera(),
+                        "No se pudo serializar la respuesta del proveedor"));
                 }
+
+                idempotenciaDurable.guardar(idTransaccion, institucion, operador,
+                    "COMPLETADA", responseJson, hash);
+                idempotencia.guardar(clave, responseJson);
+
+                long duracionMs = milisegundos(inicio);
+                auditoria.registrar(solicitud, respuesta, duracionMs);
+                logs.registrar("INFO", RecaudacionUseCaseImpl.class.getName(),
+                    "recaudacion completada codigo=" + respuesta.codigo(),
+                    idTransaccion, idTransaccion, institucion, operador, null);
+                LOG.infof("recaudacion completada institucion=%s operador=%s idTransaccion=%s codigo=%s duracionMs=%d",
+                    institucion, operador, idTransaccion, respuesta.codigo(), duracionMs);
+                return respuesta;
+            } catch (RuntimeException e) {
+                idempotenciaDurable.marcarError(idTransaccion);
+                idempotencia.eliminar(clave);
+                throw e;
             }
-
-            RecaudacionResponse respuesta = canal.ejecutar(solicitud);
-            String responseJson = serializar(respuesta);
-
-            if (idempotencia.habilitada()) {
-                idempotencia.guardar(idTransaccion, responseJson);
-            }
-            idempotenciaDurable.guardar(idTransaccion, institucion, operador, "OK", responseJson, null);
-
-            long duracionMs = milisegundos(inicio);
-            auditoria.registrar(solicitud, respuesta, duracionMs);
-            logs.registrar("INFO", RecaudacionUseCaseImpl.class.getName(),
-                "recaudacion completada codigo=" + respuesta.codigo(),
-                idTransaccion, idTransaccion, institucion, operador, null);
-            LOG.infof("recaudacion completada institucion=%s operador=%s idTransaccion=%s codigo=%s duracionMs=%d",
-                institucion, operador, idTransaccion, respuesta.codigo(), duracionMs);
-            return respuesta;
         } catch (RuntimeException e) {
-            idempotenciaDurable.guardar(idTransaccion, institucion, operador, "ERROR", null, null);
+            auditarError(solicitud, e, milisegundos(inicio));
             logs.registrar("ERROR", RecaudacionUseCaseImpl.class.getName(),
                 e.getMessage(), idTransaccion, idTransaccion, institucion, operador, null);
             throw e;
+        }
+    }
+
+    private void auditarError(RecaudacionRequest solicitud, RuntimeException error, long duracionMs) {
+        try {
+            RecaudacionResponse respuesta = RecaudacionResponse.error(
+                solicitud.institucion(), solicitud.operador(), solicitud.cabecera(),
+                error.getMessage() == null ? "Error en la operación" : error.getMessage());
+            auditoria.registrar(solicitud, respuesta, duracionMs);
+        } catch (RuntimeException e) {
+            LOG.warnf("no se pudo auditar el error idTransaccion=%s: %s",
+                solicitud.cabecera().idTransaccion(), e.getMessage());
+        }
+    }
+
+    private RecaudacionResponse leer(String json) {
+        if (json == null || json.isBlank()) {
+            return null;
+        }
+        try {
+            return objectMapper.readValue(json, RecaudacionResponse.class);
+        } catch (JsonProcessingException e) {
+            LOG.warnf("respuesta idempotente inválida: %s", e.getMessage());
+            return null;
         }
     }
 
@@ -117,6 +183,28 @@ public class RecaudacionUseCaseImpl implements RecaudacionUseCase {
         } catch (JsonProcessingException e) {
             LOG.warnf("no se pudo serializar respuesta: %s", e.getMessage());
             return null;
+        }
+    }
+
+    private String clave(RecaudacionRequest solicitud, String hash) {
+        return solicitud.institucion().name() + ":" + solicitud.operador().name()
+            + ":" + solicitud.cabecera().idTransaccion() + ":" + hash;
+    }
+
+    private String hash(RecaudacionRequest solicitud) {
+        try {
+            Map<String, Object> contenido = Map.of(
+                "institucion", solicitud.institucion().name(),
+                "operador", solicitud.operador().name(),
+                "datos", solicitud.datos());
+            byte[] resumen = MessageDigest.getInstance("SHA-256")
+                .digest(objectMapper.writer()
+                    .with(com.fasterxml.jackson.databind.SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS)
+                    .writeValueAsString(contenido)
+                    .getBytes(StandardCharsets.UTF_8));
+            return HexFormat.of().formatHex(resumen);
+        } catch (NoSuchAlgorithmException | JsonProcessingException e) {
+            throw new IllegalStateException("No se pudo calcular el hash de la solicitud", e);
         }
     }
 

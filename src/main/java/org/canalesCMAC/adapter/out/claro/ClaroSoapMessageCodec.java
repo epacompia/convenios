@@ -10,6 +10,7 @@ import jakarta.enterprise.context.ApplicationScoped;
 import org.canalesCMAC.application.port.MapeadorOperacion;
 import org.canalesCMAC.application.port.PeticionSalida;
 import org.canalesCMAC.application.port.RespuestaCruda;
+import org.canalesCMAC.domain.exception.ProveedorException;
 import org.canalesCMAC.domain.model.Canonico;
 import org.canalesCMAC.domain.model.Institucion;
 import org.canalesCMAC.domain.model.Mapas;
@@ -160,7 +161,14 @@ public class ClaroSoapMessageCodec implements MapeadorOperacion {
                 returnNode.path("codigoAutorizacion").asText();
             LOG.debugf("respuesta CLARO codigoRespuesta=%s", codigoRespuesta);
         } catch (JsonProcessingException e) {
-            LOG.errorf("respuesta CLARO inválida: %s", e.getMessage());
+            throw new ProveedorException(
+                "Respuesta CLARO inválida: " + e.getMessage(),
+                ProveedorException.BAD_GATEWAY, false, e);
+        }
+        if (codigoRespuesta == null || codigoRespuesta.isBlank()) {
+            throw new ProveedorException(
+                "Respuesta CLARO sin código de respuesta",
+                ProveedorException.BAD_GATEWAY, false, null);
         }
 
         Map<String, Object> cliente = Mapas.nuevo();

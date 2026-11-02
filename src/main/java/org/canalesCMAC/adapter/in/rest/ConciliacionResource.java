@@ -24,7 +24,10 @@ public class ConciliacionResource {
     @Produces(MediaType.APPLICATION_JSON)
     public RecaudacionConciliacion cerrar(@PathParam("fecha") String fecha,
                                           @PathParam("institucion") String institucion) {
-        return servicio.cerrar(LocalDate.parse(fecha),
-            Institucion.valueOf(institucion.toUpperCase()));
+        try {
+            return servicio.cerrar(LocalDate.parse(fecha), Institucion.desde(institucion));
+        } catch (RuntimeException e) {
+            throw new IllegalArgumentException("Parámetros de conciliación inválidos", e);
+        }
     }
 }

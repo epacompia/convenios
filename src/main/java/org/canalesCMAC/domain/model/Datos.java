@@ -3,21 +3,36 @@ package org.canalesCMAC.domain.model;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 
 import com.fasterxml.jackson.annotation.JsonAnySetter;
 import com.fasterxml.jackson.annotation.JsonFormat;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 
-/**
- * Datos del request agrupados en filtro, cliente y transacción.
- *
- * <p>Se acepta también el formato plano anterior: cualquier campo que no sea
- * {@code filtro}, {@code cliente} o {@code transaccion} se trata como parte de
- * {@code filtro}. Así los clientes existentes siguen funcionando durante la
- * transición.</p>
- */
+import org.eclipse.microprofile.openapi.annotations.media.Schema;
+
+@Schema(description = "Datos de la petición agrupados en filtro, cliente y transacción")
 public class Datos {
+
+    private static final Map<String, String> ALIAS = Map.ofEntries(
+        Map.entry("ordenpago", Canonico.NUMERO_ORDEN_PAGO),
+        Map.entry("codigocontrato", Canonico.CONTRATO),
+        Map.entry("ncodigo_pago", Canonico.CODIGO_PAGO),
+        Map.entry("cnro_documento", Canonico.DOCUMENTO_CLIENTE),
+        Map.entry("cubicacion_canal", Canonico.UBICACION_CANAL),
+        Map.entry("codcontribuyente", Canonico.CODIGO_CONTRIBUYENTE),
+        Map.entry("nrooperacion", Canonico.NUMERO_OPERACION),
+        Map.entry("nrosumin", Canonico.NUMERO_SUMINISTRO),
+        Map.entry("numfactura", Canonico.NUMERO_COMPROBANTE),
+        Map.entry("fechahoraoperacion", Canonico.FECHA_OPERACION),
+        Map.entry("dfecha", Canonico.FECHA_OPERACION),
+        Map.entry("canaloperacion", Canonico.CANAL),
+        Map.entry("ccanal", Canonico.CANAL),
+        Map.entry("importedeudapagada", Canonico.MONTO),
+        Map.entry("importe", Canonico.MONTO),
+        Map.entry("nimporte", Canonico.MONTO)
+    );
 
     private Map<String, Object> filtro = new LinkedHashMap<>();
     private Map<String, Object> cliente = new LinkedHashMap<>();
@@ -41,34 +56,48 @@ public class Datos {
         return new Datos(filtro, Map.of(), List.of());
     }
 
+    @Schema(description = "Criterios de consulta e identificación del servicio o deuda")
     public Map<String, Object> getFiltro() {
         return filtro;
     }
 
     public void setFiltro(Map<String, Object> filtro) {
-        this.filtro = filtro == null ? new LinkedHashMap<>() : new LinkedHashMap<>(filtro);
+        this.filtro = normalizar(filtro);
     }
 
+    @Schema(description = "Datos del cliente que paga")
     public Map<String, Object> getCliente() {
         return cliente;
     }
 
     public void setCliente(Map<String, Object> cliente) {
-        this.cliente = cliente == null ? new LinkedHashMap<>() : new LinkedHashMap<>(cliente);
+        this.cliente = normalizar(cliente);
     }
 
+    @Schema(description = "Datos de la operación; puede contener una o varias transacciones")
     public List<Map<String, Object>> getTransaccion() {
         return transaccion;
     }
 
     @JsonFormat(with = JsonFormat.Feature.ACCEPT_SINGLE_VALUE_AS_ARRAY)
     public void setTransaccion(List<Map<String, Object>> transaccion) {
-        this.transaccion = transaccion == null ? new ArrayList<>() : new ArrayList<>(transaccion);
+        if (transaccion == null) {
+            this.transaccion = new ArrayList<>();
+            return;
+        }
+        List<Map<String, Object>> normalizadas = new ArrayList<>(transaccion.size());
+        for (Map<String, Object> item : transaccion) {
+            normalizadas.add(normalizar(item));
+        }
+        this.transaccion = normalizadas;
     }
 
     @JsonAnySetter
     public void campoAdicional(String nombre, Object valor) {
-        filtro.put(nombre, valor);
+        String canonica = canonica(nombre);
+        if (!filtro.containsKey(canonica) || filtro.get(canonica) == null) {
+            filtro.put(canonica, valor);
+        }
     }
 
     @JsonIgnore
@@ -89,10 +118,10 @@ public class Datos {
     @JsonIgnore
     public Map<String, Object> fusion() {
         Map<String, Object> fusion = new LinkedHashMap<>();
-        fusion.putAll(filtro);
-        fusion.putAll(cliente);
+        fusionar(fusion, filtro);
+        fusionar(fusion, cliente);
         if (!transaccion.isEmpty() && transaccion.get(0) != null) {
-            fusion.putAll(transaccion.get(0));
+            fusionar(fusion, transaccion.get(0));
         }
         return fusion;
     }
@@ -109,5 +138,38 @@ public class Datos {
 
     public Datos conTransaccion(Map<String, Object> tx) {
         return new Datos(filtro, cliente, List.of(tx == null ? Map.of() : tx));
+    }
+
+    @JsonIgnore
+    public static String canonica(String clave) {
+        if (clave == null) {
+            return null;
+        }
+        return ALIAS.getOrDefault(clave.trim().toLowerCase(Locale.ROOT), clave);
+    }
+
+    private static Map<String, Object> normalizar(Map<String, Object> origen) {
+        Map<String, Object> destino = new LinkedHashMap<>();
+        if (origen == null) {
+            return destino;
+        }
+        origen.forEach((clave, valor) -> {
+            String canonica = canonica(clave);
+            if (!destino.containsKey(canonica) || destino.get(canonica) == null) {
+                destino.put(canonica, valor);
+            }
+        });
+        return destino;
+    }
+
+    private static void fusionar(Map<String, Object> destino, Map<String, Object> origen) {
+        if (origen == null) {
+            return;
+        }
+        origen.forEach((clave, valor) -> {
+            if (valor != null) {
+                destino.put(clave, valor);
+            }
+        });
     }
 }

@@ -1,34 +1,110 @@
 package org.canalesCMAC.application;
 
 import java.util.ArrayList;
+import java.util.EnumMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
 import org.canalesCMAC.domain.model.Canonico;
+import org.canalesCMAC.domain.model.Datos;
 import org.canalesCMAC.domain.model.Institucion;
 import org.canalesCMAC.domain.model.Operador;
+import org.eclipse.microprofile.config.Config;
+import org.jboss.logging.Logger;
 
 import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.inject.Inject;
 
-/**
- * Matriz de obligatoriedad por convenio + operación (sección 3 del documento).
- *
- * <p>Cada elemento de la lista es un grupo de campos alternativos: basta con
- * que uno de ellos esté presente. Un campo obligatorio simple se representa
- * como un grupo de un solo elemento.</p>
- */
 @ApplicationScoped
 public class MatrizObligatoriedad {
 
-    private static final Map<Institucion, Map<Operador, List<Set<String>>>> MATRIZ = construir();
+    private static final Logger LOG = Logger.getLogger(MatrizObligatoriedad.class);
+    private static final String PREFIJO = "convenio.";
+    private static final String MARCADOR = "requerido";
+
+    private static final Map<Institucion, Map<Operador, List<Set<String>>>> POR_DEFECTO =
+        construir();
+
+    private final Map<Institucion, Map<Operador, List<Set<String>>>> matriz;
+
+    public MatrizObligatoriedad() {
+        this.matriz = copiar(POR_DEFECTO);
+    }
+
+    @Inject
+    public MatrizObligatoriedad(Config config) {
+        this.matriz = conOverrides(POR_DEFECTO, config);
+        LOG.debugf("matriz de obligatoriedad cargada convenios=%d", matriz.size());
+    }
 
     public List<Set<String>> requeridos(Institucion institucion, Operador operador) {
-        Map<Operador, List<Set<String>>> porOperador = MATRIZ.get(institucion);
+        Map<Operador, List<Set<String>>> porOperador = matriz.get(institucion);
         if (porOperador == null) {
             return List.of();
         }
         return porOperador.getOrDefault(operador, List.of());
+    }
+
+    private static Map<Institucion, Map<Operador, List<Set<String>>>> conOverrides(
+        Map<Institucion, Map<Operador, List<Set<String>>>> base, Config config) {
+        Map<Institucion, Map<Operador, List<Set<String>>>> resultado = copiar(base);
+        for (String propiedad : config.getPropertyNames()) {
+            if (!propiedad.startsWith(PREFIJO)) {
+                continue;
+            }
+            String[] partes = propiedad.split("\\.");
+            if (partes.length != 4 || !MARCADOR.equals(partes[2])) {
+                continue;
+            }
+            Institucion institucion = Institucion.desde(partes[1]);
+            if (institucion == null) {
+                continue;
+            }
+            Operador operador;
+            try {
+                operador = Operador.valueOf(partes[3]);
+            } catch (IllegalArgumentException e) {
+                LOG.warnf("operador inválido en matriz propiedad=%s", propiedad);
+                continue;
+            }
+            String valor = config.getOptionalValue(propiedad, String.class).orElse("");
+            List<Set<String>> grupos = grupos(valor);
+            if (!grupos.isEmpty()) {
+                resultado.computeIfAbsent(institucion, clave -> new EnumMap<>(Operador.class))
+                    .put(operador, grupos);
+            }
+        }
+        return resultado;
+    }
+
+    private static List<Set<String>> grupos(String valor) {
+        List<Set<String>> grupos = new ArrayList<>();
+        for (String grupo : valor.split("\\|")) {
+            Set<String> campos = new LinkedHashSet<>();
+            for (String campo : grupo.split(",")) {
+                String limpio = campo.trim();
+                if (!limpio.isBlank()) {
+                    campos.add(Datos.canonica(limpio));
+                }
+            }
+            if (!campos.isEmpty()) {
+                grupos.add(Set.copyOf(campos));
+            }
+        }
+        return List.copyOf(grupos);
+    }
+
+    private static Map<Institucion, Map<Operador, List<Set<String>>>> copiar(
+        Map<Institucion, Map<Operador, List<Set<String>>>> origen) {
+        Map<Institucion, Map<Operador, List<Set<String>>>> copia = new EnumMap<>(Institucion.class);
+        origen.forEach((institucion, porOperador) -> {
+            Map<Operador, List<Set<String>>> operadores = new EnumMap<>(Operador.class);
+            porOperador.forEach((operador, grupos) -> operadores.put(operador, List.copyOf(grupos)));
+            copia.put(institucion, operadores);
+        });
+        return copia;
     }
 
     private static Map<Institucion, Map<Operador, List<Set<String>>>> construir() {

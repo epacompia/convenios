@@ -1,5 +1,9 @@
 package org.canalesCMAC.application;
 
+import java.lang.reflect.Array;
+import java.time.OffsetDateTime;
+import java.time.format.DateTimeParseException;
+import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -11,9 +15,6 @@ import org.canalesCMAC.domain.model.RecaudacionRequest;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 
-/**
- * Validación del contrato único: cabecera y campos obligatorios de la matriz.
- */
 @ApplicationScoped
 public class ValidadorSolicitud {
 
@@ -52,6 +53,12 @@ public class ValidadorSolicitud {
             throw new IllegalArgumentException(
                 "cabecera.idTransaccion inválido: se esperaba el formato yyyyMMddHHmmss + 6 dígitos (^\\d{20}$)");
         }
+        try {
+            OffsetDateTime.parse(cabecera.fecha());
+        } catch (DateTimeParseException e) {
+            throw new IllegalArgumentException(
+                "cabecera.fecha inválida: se esperaba una fecha ISO-8601 con zona horaria");
+        }
     }
 
     private void validarCampos(RecaudacionRequest solicitud, Map<String, Object> campos) {
@@ -65,6 +72,21 @@ public class ValidadorSolicitud {
     }
 
     private boolean presente(Object valor) {
-        return valor != null && !valor.toString().isBlank();
+        if (valor == null) {
+            return false;
+        }
+        if (valor instanceof CharSequence texto) {
+            return !texto.toString().isBlank();
+        }
+        if (valor instanceof Collection<?> coleccion) {
+            return !coleccion.isEmpty();
+        }
+        if (valor instanceof Map<?, ?> mapa) {
+            return !mapa.isEmpty();
+        }
+        if (valor.getClass().isArray()) {
+            return Array.getLength(valor) > 0;
+        }
+        return true;
     }
 }

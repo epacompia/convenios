@@ -7,6 +7,8 @@ import java.util.Map;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonInclude;
 
+import org.eclipse.microprofile.openapi.annotations.media.Schema;
+
 /**
  * Contrato único de salida para los 10 convenios.
  *
@@ -25,6 +27,7 @@ import com.fasterxml.jackson.annotation.JsonInclude;
  * </pre>
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
+@Schema(name = "RecaudacionResponse", description = "Contrato único de salida de recaudación")
 public record RecaudacionResponse(
     Institucion institucion,
     Operador operador,

@@ -64,4 +64,22 @@ class AuditoriaRecaudacionTest {
         assertTrue(pagos.porTransaccion(detalle.get(0).id).isPresent());
         assertTrue(clientes.porOperacion(guardada.get().id).isPresent());
     }
+
+    @Test
+    void unaConsultaDePagoNoGeneraRegistroDePago() {
+        RecaudacionRequest solicitud = new RecaudacionRequest(
+            Institucion.PAYTOPERU, Operador.CONSULTA_PAGO, Cabecera.generar(),
+            new Datos(Map.of("codigoPago", "123"), Map.of(), List.of()));
+        RecaudacionResponse respuesta = RecaudacionResponse.de(
+            Institucion.PAYTOPERU, Operador.CONSULTA_PAGO, solicitud.cabecera(),
+            "00", "OK", Map.of(), List.of(Map.of("monto", 10.00)));
+
+        auditoria.registrar(solicitud, respuesta, 5L);
+
+        OperacionRecaudacion operacion = repositorio
+            .porIdTransaccion(solicitud.cabecera().idTransaccion()).orElseThrow();
+        List<RecaudacionTransaccion> detalle = transacciones.porOperacion(operacion.id);
+        assertFalse(detalle.isEmpty());
+        assertTrue(pagos.porTransaccion(detalle.get(0).id).isEmpty());
+    }
 }

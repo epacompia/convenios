@@ -4,9 +4,9 @@ import java.time.OffsetDateTime;
 
 import org.jboss.logging.Logger;
 
+import io.quarkus.narayana.jta.QuarkusTransaction;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
-import jakarta.transaction.Transactional;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 
 @ApplicationScoped
@@ -23,7 +23,6 @@ public class LogPersistente {
     @ConfigProperty(name = "recaudacion.logs.enabled", defaultValue = "true")
     boolean habilitado;
 
-    @Transactional
     public void registrar(String nivel,
                           String logger,
                           String mensaje,
@@ -36,6 +35,22 @@ public class LogPersistente {
             return;
         }
         try {
+            QuarkusTransaction.requiringNew().run(() -> persistir(nivel, logger, mensaje,
+                traceId, idTransaccion, institucion, operador, contextoJson));
+        } catch (RuntimeException e) {
+            LOG.warnf("no se pudo persistir log idTransaccion=%s: %s",
+                idTransaccion, e.getMessage());
+        }
+    }
+
+    private void persistir(String nivel,
+                           String logger,
+                           String mensaje,
+                           String traceId,
+                           String idTransaccion,
+                           String institucion,
+                           String operador,
+                           String contextoJson) {
             RecaudacionLog entidad = new RecaudacionLog();
             entidad.nivel = nivel;
             entidad.logger = logger;
@@ -49,9 +64,5 @@ public class LogPersistente {
             entidad.contextoJson = contextoJson;
             entidad.fechaLog = OffsetDateTime.now();
             repositorio.persist(entidad);
-        } catch (RuntimeException e) {
-            LOG.warnf("no se pudo persistir log idTransaccion=%s: %s",
-                idTransaccion, e.getMessage());
-        }
     }
 }

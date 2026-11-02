@@ -13,6 +13,7 @@ import org.canalesCMAC.adapter.out.soap.SoapSupport;
 import org.canalesCMAC.application.port.MapeadorOperacion;
 import org.canalesCMAC.application.port.PeticionSalida;
 import org.canalesCMAC.application.port.RespuestaCruda;
+import org.canalesCMAC.domain.exception.ProveedorException;
 import org.canalesCMAC.domain.model.Canonico;
 import org.canalesCMAC.domain.model.Institucion;
 import org.canalesCMAC.domain.model.Mapas;
@@ -151,7 +152,12 @@ public class YaGanasteSoapMessageCodec implements MapeadorOperacion {
         NodoXml raiz = SoapSupport.cuerpo(respuesta.cuerpo());
         NodoXml response = raiz.hijo("response") == null ? raiz : raiz.hijo("response");
 
-        String codigo = primero(texto(response, "responseCode"), texto(response, "codigo"), "00");
+        String codigo = primero(texto(response, "responseCode"), texto(response, "codigo"), "");
+        if (codigo == null || codigo.isBlank()) {
+            throw new ProveedorException(
+                "Respuesta de YAGANASTE sin código",
+                ProveedorException.BAD_GATEWAY, false, null);
+        }
         String mensaje = primero(texto(response, "errMessage"), texto(response, "mensaje"), "OK");
 
         Map<String, Object> cliente = Mapas.nuevo();

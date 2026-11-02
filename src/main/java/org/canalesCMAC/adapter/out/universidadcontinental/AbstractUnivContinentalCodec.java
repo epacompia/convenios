@@ -10,6 +10,7 @@ import org.canalesCMAC.application.port.MapeadorOperacion;
 import org.canalesCMAC.application.port.PeticionSalida;
 import org.canalesCMAC.application.port.RespuestaCruda;
 import org.canalesCMAC.domain.exception.OperadorNoSoportadoException;
+import org.canalesCMAC.domain.exception.ProveedorException;
 import org.canalesCMAC.domain.model.Canonico;
 import org.canalesCMAC.domain.model.Mapas;
 import org.canalesCMAC.domain.model.RecaudacionRequest;
@@ -91,7 +92,13 @@ abstract class AbstractUnivContinentalCodec implements MapeadorOperacion {
         Map<String, Object> transaccion = Mapas.nuevo();
         try {
             JsonNode root = objectMapper.readTree(respuesta.cuerpo());
-            codigo = normalizarCodigo(texto(root, "Codigo"));
+            String codigoProveedor = texto(root, "Codigo");
+            if (codigoProveedor == null || codigoProveedor.isBlank()) {
+                throw new ProveedorException(
+                    "Respuesta de " + institucion() + " sin código",
+                    ProveedorException.BAD_GATEWAY, false, null);
+            }
+            codigo = normalizarCodigo(codigoProveedor);
             mensaje = texto(root, "Mensaje");
             Mapas.poner(cliente, Canonico.NOMBRE_CLIENTE, texto(root, "Cliente"));
             Mapas.poner(transaccion, Canonico.NUM_OPERACION, texto(root, "NumeroOperacion"));

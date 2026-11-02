@@ -1,5 +1,6 @@
 package org.canalesCMAC.domain.model;
 
+import java.net.InetAddress;
 import java.time.OffsetDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.concurrent.atomic.AtomicLong;
@@ -7,9 +8,12 @@ import java.util.concurrent.atomic.AtomicLong;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
+import org.eclipse.microprofile.openapi.annotations.media.Schema;
+
 /**
  * Metadatos genéricos de la petición, comunes a todos los convenios.
  */
+@Schema(name = "Cabecera", description = "Metadatos de correlación, trazabilidad y auditoría")
 public record Cabecera(
     String idTransaccion,
     String idSesion,
@@ -21,9 +25,10 @@ public record Cabecera(
     String idAplicacion) {
 
     private static final AtomicLong SECUENCIA =
-        new AtomicLong(System.nanoTime() % 1_000_000L);
+        new AtomicLong(System.nanoTime() % 10_000L);
     private static final DateTimeFormatter FORMATO_ID =
         DateTimeFormatter.ofPattern("yyyyMMddHHmmss");
+    private static final int CODIGO_NODO = codigoNodo();
 
     @JsonCreator
     public Cabecera(
@@ -51,8 +56,18 @@ public record Cabecera(
     }
 
     public static String generarIdTransaccion() {
-        long secuencia = Math.floorMod(SECUENCIA.incrementAndGet(), 1_000_000L);
-        return OffsetDateTime.now().format(FORMATO_ID) + String.format("%06d", secuencia);
+        long secuencia = Math.floorMod(SECUENCIA.incrementAndGet(), 10_000L);
+        return OffsetDateTime.now().format(FORMATO_ID)
+            + String.format("%02d%04d", CODIGO_NODO, secuencia);
+    }
+
+    private static int codigoNodo() {
+        try {
+            String nombre = InetAddress.getLocalHost().getHostName();
+            return Math.floorMod(nombre.hashCode(), 100);
+        } catch (Exception e) {
+            return Math.floorMod((int) ProcessHandle.current().pid(), 100);
+        }
     }
 
     private static String textoOGenerado(String valor) {

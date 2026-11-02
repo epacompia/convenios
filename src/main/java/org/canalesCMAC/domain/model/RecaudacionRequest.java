@@ -6,13 +6,20 @@ import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
+import org.eclipse.microprofile.openapi.annotations.media.Schema;
+
 /**
  * Contrato único de entrada para los 10 convenios.
  */
+@Schema(name = "RecaudacionRequest", description = "Contrato único de entrada de recaudación")
 public record RecaudacionRequest(
+    @Schema(description = "Convenio que procesa la operación", example = "SEAL")
     Institucion institucion,
+    @Schema(description = "Operación a ejecutar", example = "CONSULTA_DEUDA")
     Operador operador,
+    @Schema(description = "Metadatos de correlación y auditoría")
     Cabecera cabecera,
+    @Schema(description = "Datos agrupados de la petición")
     Datos datos) {
 
     @JsonCreator

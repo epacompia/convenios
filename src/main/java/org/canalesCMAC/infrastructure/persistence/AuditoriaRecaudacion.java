@@ -10,6 +10,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
 import org.canalesCMAC.domain.model.Cabecera;
 import org.canalesCMAC.domain.model.Operador;
@@ -17,9 +18,9 @@ import org.canalesCMAC.domain.model.RecaudacionRequest;
 import org.canalesCMAC.domain.model.RecaudacionResponse;
 import org.jboss.logging.Logger;
 
+import io.quarkus.narayana.jta.QuarkusTransaction;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
-import jakarta.transaction.Transactional;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 
 /**
@@ -60,12 +61,25 @@ public class AuditoriaRecaudacion {
     @ConfigProperty(name = "recaudacion.auditoria.fail-on-error", defaultValue = "false")
     boolean fallarSiError;
 
-    @Transactional
     public void registrar(RecaudacionRequest solicitud, RecaudacionResponse respuesta, long duracionMs) {
         if (!habilitada) {
             return;
         }
         try {
+            QuarkusTransaction.requiringNew().run(
+                () -> registrarInterno(solicitud, respuesta, duracionMs));
+        } catch (RuntimeException e) {
+            if (fallarSiError) {
+                throw e;
+            }
+            LOG.errorf("no se pudo guardar la auditoría idTransaccion=%s: %s",
+                solicitud.cabecera().idTransaccion(), e.getMessage());
+        }
+    }
+
+    private void registrarInterno(RecaudacionRequest solicitud,
+                                  RecaudacionResponse respuesta,
+                                  long duracionMs) {
             Cabecera cabecera = solicitud.cabecera();
             Optional<OperacionRecaudacion> existente =
                 operaciones.porIdTransaccion(cabecera.idTransaccion());
@@ -99,13 +113,6 @@ public class AuditoriaRecaudacion {
 
             guardarCliente(operacion, solicitud, respuesta);
             guardarTransacciones(operacion, solicitud, respuesta);
-        } catch (RuntimeException e) {
-            if (fallarSiError) {
-                throw e;
-            }
-            LOG.errorf("no se pudo guardar la auditoría idTransaccion=%s: %s",
-                solicitud.cabecera().idTransaccion(), e.getMessage());
-        }
     }
 
     private void guardarCliente(OperacionRecaudacion operacion,
@@ -266,21 +273,26 @@ public class AuditoriaRecaudacion {
         extornos.persist(extorno);
     }
 
+    private static final Set<String> OPERADORES_PAGO = Set.of(
+        "PAGO", "PAGO_DEUDA", "RECARGA", "VENTA", "NOTIFICACION_PAGO",
+        "NOTIFICACION_PAGO_ORDINARIO", "CONFIRMACION_PAGO", "CONFIRMAR_LOTE",
+        "CONFIRMAR_DIRECTO", "UNIVERSIDAD_PAGO_DEUDA", "CENTRO_IDIOMAS_PAGO_DEUDA");
+
+    private static final Set<String> OPERADORES_EXTORNO = Set.of(
+        "EXTORNO_PAGO", "EXTORNO_PAGO_AUTO", "EXTORNO_AUTO", "EXTORNO_RECARGA",
+        "EXTORNO_ANULACION_PAGO", "EXTORNO_ANULACION_RECARGA", "ANULACION",
+        "ANULACION_PAGO", "ANULACION_RECARGA", "ANULAR_TRANSACCION", "DEVOLUCION",
+        "AUTO_EXTORNO", "UNIVERSIDAD_EXTORNO_DEUDA", "CENTRO_IDIOMAS_EXTORNO_DEUDA");
+
     private boolean esPago(Operador operador, Map<String, Object> datos) {
-        String nombre = operador.name();
-        return nombre.contains("PAGO")
-            || nombre.contains("RECARGA")
-            || nombre.contains("VENTA")
+        return OPERADORES_PAGO.contains(operador.name())
             || datos.containsKey("numeroTarjeta")
             || datos.containsKey("medioPago")
             || datos.containsKey("formaPago");
     }
 
     private boolean esExtorno(Operador operador, Map<String, Object> datos) {
-        String nombre = operador.name();
-        return nombre.contains("EXTORNO")
-            || nombre.contains("ANULACION")
-            || nombre.contains("DEVOLUCION")
+        return OPERADORES_EXTORNO.contains(operador.name())
             || datos.containsKey("numeroOperacionOriginal")
             || datos.containsKey("motivoExtorno");
     }

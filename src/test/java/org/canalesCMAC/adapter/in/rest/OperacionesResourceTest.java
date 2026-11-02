@@ -31,4 +31,29 @@ class OperacionesResourceTest {
             .statusCode(400)
             .body("respuesta.codigo", is("ER"));
     }
+
+    @Test
+    void rechazaCabeceraConIdTransaccionInvalido() {
+        given()
+            .contentType(ContentType.JSON)
+            .body("{\"institucion\":\"ELSE\",\"operador\":\"CONSULTA_DEUDA\","
+                + "\"cabecera\":{\"idTransaccion\":\"123\"},"
+                + "\"datos\":{\"filtro\":{\"datoConsulta\":\"0010681504\"}}}")
+            .when().post("/api/v1/operaciones")
+            .then()
+            .statusCode(400)
+            .body("respuesta.codigo", is("ER"));
+    }
+
+    @Test
+    void rechazaParametrosOperacionVacios() {
+        given()
+            .contentType(ContentType.JSON)
+            .body("{\"institucion\":\"WESTERN_UNION\",\"operador\":\"CONSULTAR_TRANSACCION\","
+                + "\"datos\":{\"filtro\":{\"idProducto\":\"P1\",\"parametrosOperacion\":[]}}}")
+            .when().post("/api/v1/operaciones")
+            .then()
+            .statusCode(400)
+            .body("respuesta.codigo", is("ER"));
+    }
 }

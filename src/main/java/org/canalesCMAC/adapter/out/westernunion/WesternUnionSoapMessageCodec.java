@@ -14,6 +14,7 @@ import org.canalesCMAC.application.port.MapeadorOperacion;
 import org.canalesCMAC.application.port.PeticionSalida;
 import org.canalesCMAC.application.port.RespuestaCruda;
 import org.canalesCMAC.domain.exception.OperadorNoSoportadoException;
+import org.canalesCMAC.domain.exception.ProveedorException;
 import org.canalesCMAC.domain.model.Canonico;
 import org.canalesCMAC.domain.model.Institucion;
 import org.canalesCMAC.domain.model.Mapas;
@@ -167,7 +168,19 @@ public class WesternUnionSoapMessageCodec implements MapeadorOperacion {
 
         NodoXml error = respuestaNodo.hijo("error");
         String codigo = error != null ? "01" : primero(
-            texto(respuestaNodo, "codigoRespuesta"), texto(respuestaNodo, "codigo"), "00");
+            texto(respuestaNodo, "codigoRespuesta"), texto(respuestaNodo, "codigo"), "");
+        if (codigo == null || codigo.isBlank()) {
+            NodoXml loteEstado = respuestaNodo.hijo("lote");
+            String estado = loteEstado == null
+                ? texto(respuestaNodo, "estado")
+                : texto(loteEstado, "estado");
+            if (estado == null || estado.isBlank()) {
+                throw new ProveedorException(
+                    "Respuesta de WESTERN_UNION sin código ni estado",
+                    ProveedorException.BAD_GATEWAY, false, null);
+            }
+            codigo = estadoCorrecto(estado) ? "00" : "01";
+        }
         String mensaje = primero(error == null ? null : texto(error, "mensaje"),
             texto(respuestaNodo, "mensaje"), "OK");
 
@@ -278,5 +291,18 @@ public class WesternUnionSoapMessageCodec implements MapeadorOperacion {
             }
         }
         return "";
+    }
+
+    private static boolean estadoCorrecto(String estado) {
+        String normal = estado.trim().toUpperCase(java.util.Locale.ROOT);
+        return "ACEPTADA".equals(normal)
+            || "ACEPTADO".equals(normal)
+            || "OK".equals(normal)
+            || "PROCESADA".equals(normal)
+            || "PROCESADO".equals(normal)
+            || "CONFIRMADA".equals(normal)
+            || "CONFIRMADO".equals(normal)
+            || "EXITOSA".equals(normal)
+            || "EXITOSO".equals(normal);
     }
 }

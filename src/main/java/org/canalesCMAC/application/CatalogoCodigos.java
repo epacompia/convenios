@@ -37,6 +37,17 @@ public class CatalogoCodigos {
         return mensajeProveedor;
     }
 
+    public String normalizar(String codigo) {
+        if (codigo == null || codigo.isBlank()) {
+            return "99";
+        }
+        String limpio = codigo.trim();
+        return switch (limpio) {
+            case "0", "0000", "00000" -> "00";
+            default -> limpio;
+        };
+    }
+
     private static Map<Institucion, Map<String, String>> parsear(Config config) {
         Map<Institucion, Map<String, String>> resultado = new EnumMap<>(Institucion.class);
         for (String propiedad : config.getPropertyNames()) {
