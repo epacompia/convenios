@@ -38,6 +38,7 @@ public final class Canonico {
     public static final String DOCUMENTO_CLIENTE = "numeroDocumento";
     public static final String NOMBRE_CLIENTE = "nombreCliente";
     public static final String CODIGO_CONTRIBUYENTE = "codigoContribuyente";
+    public static final String CODIGO_CLIENTE = "codigoCliente";
     public static final String DIRECCION_CLIENTE = "direccionCliente";
     public static final String DISTRITO_CLIENTE = "distritoCliente";
     public static final String EMAIL = "email";
@@ -47,6 +48,11 @@ public final class Canonico {
     public static final String NUM_OPERACION = "numeroOperacion";
     public static final String NUMERO_OPERACION = "numeroOperacion";
     public static final String NUMERO_TRACE = "numeroTrace";
+    public static final String NUMERO_PEDIDO = "numeroPedido";
+    public static final String NUMERO_TARJETA = "numeroTarjeta";
+    public static final String NOMBRE_TARJETA_HABIENTE = "nombreTarjetaHabiente";
+    public static final String PROVEEDOR_NOMBRE = "proveedorNombre";
+    public static final String EXITO = "exito";
     public static final String NUMERO_OPERACION_ORIGINAL = "numeroOperacionOriginal";
     public static final String MONTO = "monto";
     public static final String FECHA_OPERACION = "fechaOperacion";

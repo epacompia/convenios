@@ -31,7 +31,19 @@ public class Datos {
         Map.entry("ccanal", Canonico.CANAL),
         Map.entry("importedeudapagada", Canonico.MONTO),
         Map.entry("importe", Canonico.MONTO),
-        Map.entry("nimporte", Canonico.MONTO)
+        Map.entry("nimporte", Canonico.MONTO),
+        Map.entry("codigo_transaccion", Canonico.NUMERO_OPERACION),
+        Map.entry("codigotransaccion", Canonico.NUMERO_OPERACION),
+        Map.entry("numero_operacion", Canonico.IDENTIFICADOR_PAGO),
+        Map.entry("nombre_tarjeta_habiente", Canonico.NOMBRE_TARJETA_HABIENTE),
+        Map.entry("nombretarjetahabiente", Canonico.NOMBRE_TARJETA_HABIENTE),
+        Map.entry("numero_pedido", Canonico.NUMERO_PEDIDO),
+        Map.entry("numeropedido", Canonico.NUMERO_PEDIDO),
+        Map.entry("codigo_autorizacion", Canonico.CODIGO_APROBACION),
+        Map.entry("codigoautorizacion", Canonico.CODIGO_APROBACION),
+        Map.entry("importe_autorizado", Canonico.MONTO),
+        Map.entry("importeautorizado", Canonico.MONTO),
+        Map.entry("proveedornombre", Canonico.PROVEEDOR_NOMBRE)
     );
 
     private Map<String, Object> filtro = new LinkedHashMap<>();

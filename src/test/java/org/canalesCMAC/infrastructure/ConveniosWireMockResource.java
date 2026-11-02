@@ -9,6 +9,8 @@ import static com.github.tomakehurst.wiremock.client.WireMock.urlPathEqualTo;
 import java.util.HashMap;
 import java.util.Map;
 
+import org.canalesCMAC.adapter.out.unsaac.AesCifrado;
+
 import com.github.tomakehurst.wiremock.WireMockServer;
 import com.github.tomakehurst.wiremock.core.WireMockConfiguration;
 
@@ -27,6 +29,7 @@ public class ConveniosWireMockResource implements QuarkusTestResourceLifecycleMa
     private WireMockServer yaganasteServer;
     private WireMockServer muniCuscoServer;
     private WireMockServer payToPeruServer;
+    private WireMockServer unsaacServer;
 
     @Override
     public Map<String, String> start() {
@@ -38,6 +41,7 @@ public class ConveniosWireMockResource implements QuarkusTestResourceLifecycleMa
         yaganasteServer = servidor();
         muniCuscoServer = servidor();
         payToPeruServer = servidor();
+        unsaacServer = servidor();
         configurarElse();
         configurarEu();
         configurarSeal();
@@ -46,6 +50,7 @@ public class ConveniosWireMockResource implements QuarkusTestResourceLifecycleMa
         configurarYaGanaste();
         configurarMuniCusco();
         configurarPayToPeru();
+        configurarUnsAac();
 
         Map<String, String> propiedades = new HashMap<>();
         propiedades.put("convenio.ELSE.url",
@@ -58,13 +63,17 @@ public class ConveniosWireMockResource implements QuarkusTestResourceLifecycleMa
         propiedades.put("convenio.MUNICIPALIDAD_CUSCO.url",
             "http://localhost:" + muniCuscoServer.port() + "/api/servicio");
         propiedades.put("convenio.PAYTOPERU.url", "http://localhost:" + payToPeruServer.port() + "/cmac");
+        propiedades.put("convenio.UNSAAC.url",
+            "http://localhost:" + unsaacServer.port() + "/recaudacion");
+        propiedades.put("convenio.UNSAAC.claveCifrado", "_aaaae00th@h%h1234");
         return propiedades;
     }
 
     @Override
     public void stop() {
         for (WireMockServer servidor : new WireMockServer[] {
-            elseServer, euServer, sealServer, claroServer, ucuscoServer, yaganasteServer, muniCuscoServer, payToPeruServer }) {
+            elseServer, euServer, sealServer, claroServer, ucuscoServer, yaganasteServer,
+            muniCuscoServer, payToPeruServer, unsaacServer }) {
             if (servidor != null) {
                 servidor.stop();
             }
@@ -220,6 +229,46 @@ public class ConveniosWireMockResource implements QuarkusTestResourceLifecycleMa
             .willReturn(okJson("{\"berror\":false,\"cmensaje\":\"OK\",\"ncodigo_pago\":123,"
                 + "\"cnro_documento\":\"12345678\",\"cnombres\":\"JUAN\",\"capellidos\":\"PEREZ\","
                 + "\"cemail\":\"juan@example.com\",\"nimporte\":10.5,\"nmoneda\":1,\"cconcepto\":\"RECIBO\"}")));
+    }
+
+    private void configurarUnsAac() {
+        String clave = "_aaaae00th@h%h1234";
+        String consulta = "{\"codigo_transaccion\":\"O-000000001760986\","
+            + "\"keymerchant\":\"20172474501\",\"importe\":\"300.50\",\"items\":1,"
+            + "\"moneda\":\"1\",\"email\":\"171879@unsaac.edu.pe\","
+            + "\"codigo_cliente\":\"435623\",\"nombres\":\"CASTRO-REYNA-DAVID\","
+            + "\"descripción\":\"Matricula pregrado 2022-2\",\"ccp\":\"10012\","
+            + "\"conceptos\":[{\"nro\":1,\"codigo\":\"116\","
+            + "\"descripcion\":\"Certificacion\",\"valor\":\"20.00\"}]}";
+        unsaacServer.stubFor(post(urlPathEqualTo("/recaudacion/SRVPPConsultaDetallePagoCC"))
+            .willReturn(aResponse().withStatus(200)
+                .withHeader("Content-Type", "application/json")
+                .withBody(envelope(true, null, "M02", AesCifrado.cifrar(consulta, clave)))));
+
+        String pago = "{\"codigo_transaccion\":\"O-000000001760986\","
+            + "\"codigo_pago\":\"V-000000000208456\",\"clave\":\"23300\","
+            + "\"estado\":\"correcto\",\"mensaje\":\"\"}";
+        unsaacServer.stubFor(post(urlPathEqualTo("/recaudacion/SRVPPGuardarPagoCC"))
+            .willReturn(aResponse().withStatus(200)
+                .withHeader("Content-Type", "application/json")
+                .withBody(envelope(true, null, "M02", AesCifrado.cifrar(pago, clave)))));
+
+        unsaacServer.stubFor(post(urlPathEqualTo("/recaudacion/SRVPPVerificarPagoCC"))
+            .willReturn(aResponse().withStatus(200)
+                .withHeader("Content-Type", "application/json")
+                .withBody(envelope(true, null, "M02", null))));
+
+        unsaacServer.stubFor(post(urlPathEqualTo("/recaudacion/SRVPPConfirmarPagoCC"))
+            .willReturn(aResponse().withStatus(200)
+                .withHeader("Content-Type", "application/json")
+                .withBody(envelope(true, null, "M02", null))));
+    }
+
+    private String envelope(boolean exito, String mensaje, String codresp, String objeto) {
+        return "{\"exito\":" + exito + ",\"mensaje\":"
+            + (mensaje == null ? "null" : "\"" + mensaje + "\"")
+            + ",\"codresp\":\"" + codresp + "\",\"objeto\":"
+            + (objeto == null ? "null" : "\"" + objeto + "\"") + "}";
     }
 
     private String sealConsultaResponse() {

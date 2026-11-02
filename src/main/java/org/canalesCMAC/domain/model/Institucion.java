@@ -16,7 +16,8 @@ public enum Institucion {
     YAGANASTE,
     WESTERN_UNION,
     UNIVCONTINENTAL_UNIVERSIDAD,
-    UNIVCONTINENTAL_CIDIOMAS;
+    UNIVCONTINENTAL_CIDIOMAS,
+    UNSAAC;
 
     @JsonCreator
     public static Institucion desde(String valor) {
@@ -26,6 +27,12 @@ public enum Institucion {
         String normal = valor.trim().toUpperCase(Locale.ROOT);
         if ("UNIVCONTINENTAL".equals(normal)) {
             return UNIVCONTINENTAL_UNIVERSIDAD;
+        }
+        if ("SERVICIOS_CAJACUSCO_V2".equals(normal)
+            || "CAJA_CUSCO_V2".equals(normal)
+            || "CAJACUSCO_V2".equals(normal)
+            || "SERVICIOS_CAJA_CUSCO_V2".equals(normal)) {
+            return UNSAAC;
         }
         return Institucion.valueOf(normal);
     }

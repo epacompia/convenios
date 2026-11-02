@@ -6,7 +6,7 @@
 >
 > **Correcciones aplicadas:** idempotencia atómica por `idTransaccion` (reserva previa en base de datos, hash del payload y TTL de proceso), respuestas de proveedor inválidas con fallo cerrado (HTTP 502/`ER`), mapeo de excepciones de resiliencia al contrato, alias del §8, matriz de obligatoriedad configurable (`convenio.<X>.requerido.<OPERADOR>`), resiliencia por convenio (circuito, bulkhead y rate limit), reintentos solo para operaciones idempotentes, auditoría aislada en su propia transacción y documentación OpenAPI (`/q/openapi`, `/q/swagger-ui`). Quedan como roadmap el cliente reactivo, los hilos virtuales y el caché de consultas.
 
-> **Alcance:** unificar **un solo request** para los **10 convenios**: ELSE, ELECTRO_UCAYALI, SEAL, CLARO, UNIVCUSCO, YAGANASTE, MUNICIPALIDAD_CUSCO, PAYTOPERU, WESTERN_UNION y UNIVCONTINENTAL (Universidad + Centro de Idiomas).
+> **Alcance:** unificar **un solo request** para los **convenios**: ELSE, ELECTRO_UCAYALI, SEAL, CLARO, UNIVCUSCO, YAGANASTE, MUNICIPALIDAD_CUSCO, PAYTOPERU, WESTERN_UNION, UNIVCONTINENTAL (Universidad + Centro de Idiomas) y UNSAAC (Servicios Caja Cusco v2).
 > **Objetivo:** que exista **un único contrato de entrada** (mismo request para todos los convenios y todas las operaciones), con un objeto `datos` **organizado en grupos** (`filtro`, `cliente`, `transaccion`) según la idea de Hildebrando, donde cada campo es **obligatorio u opcional** según el convenio y la operación.
 > **Validado contra** los instructivos de `docs/` (uno por convenio) y el código actual.
 
@@ -1290,8 +1290,127 @@ Tecnología: **`quarkus-redis-client`** (Vert.x Redis, no bloqueante), **`quarku
 
 ## 14. Resumen para negocio
 
-- **Un solo request** para los **10 convenios** y todas sus operaciones.
+- **Un solo request** para todos los convenios (incluido UNSAAC) y todas sus operaciones.
 - El objeto `datos` está **ordenado en tres grupos**: `filtro` (qué buscar), `cliente` (quién paga) y `transaccion` (qué operación).
 - Cada campo es **obligatorio u opcional según la operación**.
 - El backend sigue traduciendo al formato de cada proveedor (SOAP, REST, ISO8583); el cliente solo conoce **un idioma**.
 - Agregar un convenio nuevo = mapear los campos comunes a su formato, **sin cambiar el request de entrada**.
+
+---
+
+## 15. Convenio UNSAAC — Servicios Caja Cusco v2
+
+Convenio incorporado desde `docs/Servicios CajaCusco_v2_PRODUCCION.docx` y la colección `docs/UNSAAC.postman_collection.json`. La institución es `UNSAAC` y se aceptan como alias `SERVICIOS_CAJACUSCO_V2`, `CAJA_CUSCO_V2`, `CAJACUSCO_V2` y `SERVICIOS_CAJA_CUSCO_V2`.
+
+### 15.1 Operaciones
+
+| Operador | Endpoint | Parámetro(s) HTTP |
+|---|---|---|
+| `CONSULTA_DEUDA` | `/SRVPPConsultaDetallePagoCC` | `codigo_transaccion` cifrado |
+| `PAGO_DEUDA` | `/SRVPPGuardarPagoCC` | `pago` cifrado (JSON) |
+| `VERIFICAR_PAGO` | `/SRVPPVerificarPagoCC` | `ccodigos_transaccion` cifrado (`O-1|O-2`) |
+| `CONFIRMAR_PAGO` | `/SRVPPConfirmarPagoCC` | `codigo_transaccion` cifrado, `exito`, `numero_operacion` |
+
+Todos son `POST` con `Content-Type: application/x-www-form-urlencoded`.
+
+### 15.2 Cifrado
+
+- Algoritmo: AES-256-CBC, formato OpenSSL `Salted__`, derivación de clave compatible con `aes-everywhere` (MD5).
+- Clave de producción por defecto: `xaadaippth@@%m5678`.
+- Configuración: `convenio.UNSAAC.claveCifrado` / variable `UNSAAC_CLAVE_CIFRADO`.
+- La colección Postman de ejemplo usa la clave de pruebas v1 `_aaaae00th@h%h1234`; las pruebas unitarias la usan para validar los ejemplos originales.
+- URL por defecto: `https://servicios.unsaac.edu.pe/recaudacion`; configurable con `UNSAAC_URL`.
+
+### 15.3 Matriz de obligatoriedad
+
+| Operador | Obligatorios |
+|---|---|
+| `CONSULTA_DEUDA` | `numeroOperacion` |
+| `PAGO_DEUDA` | `numeroOperacion`, `monto`, `fechaOperacion`, `numeroTarjeta`, `nombreTarjetaHabiente`, `codigoAprobacion`, `numeroPedido`, `formaPago` |
+| `VERIFICAR_PAGO` | `transacciones[]` (cada elemento con `numeroOperacion`) |
+| `CONFIRMAR_PAGO` | `numeroOperacion`, `identificadorPago`, `exito` |
+
+Opcionales: `email`, `proveedorNombre`, `moneda`, `canal`.
+
+### 15.4 Mapeo request común → UNSAAC
+
+| Campo común | UNSAAC |
+|---|---|
+| `numeroOperacion` | `codigo_transaccion` |
+| `monto` | `importe_autorizado` |
+| `fechaOperacion` | `fecha` (`ddMMyyyyHHmmss`) |
+| `numeroTarjeta` | `numero_tarjeta` |
+| `nombreTarjetaHabiente` | `nombre_tarjeta_habiente` |
+| `codigoAprobacion` | `codigo_autorizacion` |
+| `numeroPedido` | `numero_pedido` |
+| `formaPago` | `forma_pago` |
+| `email` | `email` |
+| `proveedorNombre` | `proveedorNombre` |
+| `transacciones[].numeroOperacion` | `ccodigos_transaccion` (`O-1|O-2`) |
+| `identificadorPago` | `numero_operacion` (confirmación) |
+| `exito` | `exito` (confirmación) |
+
+### 15.5 Ejemplos del request único
+
+**UNSAAC — consulta**
+```json
+{ "institucion": "UNSAAC", "operador": "CONSULTA_DEUDA",
+  "datos": { "filtro": { "numeroOperacion": "1760986" }, "cliente": {}, "transaccion": [] } }
+```
+
+**UNSAAC — pago**
+```json
+{ "institucion": "UNSAAC", "operador": "PAGO_DEUDA",
+  "datos": {
+    "filtro": { "numeroOperacion": "O-000000001760986" },
+    "cliente": {},
+    "transaccion": [ {
+      "monto": "8.00", "fechaOperacion": "2026-10-31T18:00:00",
+      "numeroTarjeta": "000000XXXXX00000", "nombreTarjetaHabiente": "QUISPE MAMANI THALIA",
+      "codigoAprobacion": "010735", "numeroPedido": "123456",
+      "formaPago": "VENTANILLA CAJA CUSCO", "email": "171879@unsaac.edu.pe"
+    } ] } }
+```
+
+**UNSAAC — verificar órdenes**
+```json
+{ "institucion": "UNSAAC", "operador": "VERIFICAR_PAGO",
+  "datos": { "filtro": { "transacciones": [
+    { "numeroOperacion": "O-1" }, { "numeroOperacion": "O-2" } ] },
+    "cliente": {}, "transaccion": [] } }
+```
+
+**UNSAAC — confirmar**
+```json
+{ "institucion": "UNSAAC", "operador": "CONFIRMAR_PAGO",
+  "datos": { "filtro": {
+    "numeroOperacion": "O-000000001760986",
+    "identificadorPago": "V-000000000913999",
+    "exito": true }, "cliente": {}, "transaccion": [] } }
+```
+
+### 15.6 Respuesta
+
+La respuesta mantiene el contrato único. Del `objeto` cifrado se normaliza:
+
+- `cliente.nombreCliente` ← `nombres`
+- `cliente.email` ← `email`
+- `cliente.codigoCliente` ← `codigo_cliente`
+- `transaccion.numeroOperacion` ← `codigo_transaccion`
+- `transaccion.monto` ← `importe`
+- `transaccion.moneda` ← `moneda` (`1` se normaliza a `PEN`)
+- `transaccion.cantidad` ← `items`
+- `transaccion.glosa` / `detalleConsulta` ← `descripción`
+- `transaccion.deudas[]` ← `conceptos[]` (`codigo`, `descripcion`, `valor`)
+- `transaccion.datosAdicionales` ← `keymerchant`, `ccp`, `items`, `moneda` original
+
+Para pago: `codigo_pago` → `identificadorPago`, `clave` → `clave`, `estado` → `estado`.
+Para verificación: si `exito=true`, estado `SIN_PAGOS`; si `exito=false`, las órdenes pagadas se devuelven en `deudas[]` y `datosAdicionales.ordenes[]`.
+Si `codresp=M01` se trata como fallo del proveedor (HTTP 502).
+
+### 15.7 Validación
+
+- Cifrado/descifrado validado contra los valores de la colección: `AesCifradoTest`.
+- Construcción e interpretación de las 4 operaciones: `UnsAacCodecTest`.
+- Flujos E2E con WireMock: consulta, pago, verificación y confirmación en `OperacionesE2eTest`.
+- `mvn test`: **93 tests, 0 fallos**.

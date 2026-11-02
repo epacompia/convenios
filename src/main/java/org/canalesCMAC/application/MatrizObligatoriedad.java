@@ -223,6 +223,17 @@ public class MatrizObligatoriedad {
                     Canonico.NUMERO_TRACE, Canonico.FECHA_OPERACION, Canonico.DATOS)),
                 Map.entry(Operador.CENTRO_IDIOMAS_EXTORNO_DEUDA, req(Canonico.CONTRATO,
                     Canonico.NUMERO_TRACE, Canonico.FECHA_OPERACION))
+            )),
+            Map.entry(Institucion.UNSAAC, Map.ofEntries(
+                Map.entry(Operador.CONSULTA_DEUDA, req(Canonico.NUMERO_OPERACION)),
+                Map.entry(Operador.PAGO_DEUDA, mas(req(Canonico.NUMERO_OPERACION,
+                    Canonico.MONTO, Canonico.FECHA_OPERACION, Canonico.NUMERO_TARJETA,
+                    Canonico.CODIGO_APROBACION, Canonico.NUMERO_PEDIDO,
+                    Canonico.FORMA_PAGO), unoDe(Canonico.NOMBRE_TARJETA_HABIENTE,
+                    Canonico.NOMBRE_CLIENTE))),
+                Map.entry(Operador.VERIFICAR_PAGO, req(Canonico.TRANSACCIONES)),
+                Map.entry(Operador.CONFIRMAR_PAGO, req(Canonico.NUMERO_OPERACION,
+                    Canonico.IDENTIFICADOR_PAGO, Canonico.EXITO))
             ))
         );
     }

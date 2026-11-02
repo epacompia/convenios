@@ -277,4 +277,75 @@ class OperacionesE2eTest {
             .body("respuesta.codigo", is("00"))
             .body("respuesta.cliente.nombreCliente", is("JUAN PEREZ"));
     }
+
+    @Test
+    void unsaacConsultaDeudaFlujoCompleto() {
+        given()
+            .contentType(ContentType.JSON)
+            .body("{\"institucion\":\"UNSAAC\",\"operador\":\"CONSULTA_DEUDA\",\"datos\":{"
+                + "\"filtro\":{\"numeroOperacion\":\"1760986\"}}}")
+            .when().post("/api/v1/operaciones")
+            .then()
+            .statusCode(200)
+            .body("institucion", is("UNSAAC"))
+            .body("respuesta.codigo", is("00"))
+            .body("respuesta.cliente.nombreCliente", is("CASTRO-REYNA-DAVID"))
+            .body("respuesta.cliente.codigoCliente", is("435623"))
+            .body("respuesta.transaccion[0].numeroOperacion", is("O-000000001760986"))
+            .body("respuesta.transaccion[0].moneda", is("PEN"))
+            .body("respuesta.transaccion[0].deudas[0].numeroComprobante", is("116"));
+    }
+
+    @Test
+    void unsaacVerificarPagoSinPagos() {
+        given()
+            .contentType(ContentType.JSON)
+            .body("{\"institucion\":\"UNSAAC\",\"operador\":\"VERIFICAR_PAGO\",\"datos\":{"
+                + "\"filtro\":{\"transacciones\":[{\"numeroOperacion\":\"O-1\"},"
+                + "{\"numeroOperacion\":\"O-2\"}]}}}")
+            .when().post("/api/v1/operaciones")
+            .then()
+            .statusCode(200)
+            .body("institucion", is("UNSAAC"))
+            .body("respuesta.codigo", is("00"))
+            .body("respuesta.transaccion[0].estado", is("SIN_PAGOS"));
+    }
+
+    @Test
+    void unsaacConfirmarPago() {
+        given()
+            .contentType(ContentType.JSON)
+            .body("{\"institucion\":\"UNSAAC\",\"operador\":\"CONFIRMAR_PAGO\",\"datos\":{"
+                + "\"filtro\":{\"numeroOperacion\":\"O-000000001760986\","
+                + "\"identificadorPago\":\"V-000000000913999\",\"exito\":true}}}")
+            .when().post("/api/v1/operaciones")
+            .then()
+            .statusCode(200)
+            .body("institucion", is("UNSAAC"))
+            .body("respuesta.codigo", is("00"))
+            .body("respuesta.transaccion[0].estado", is("OK"))
+            .body("respuesta.transaccion[0].identificadorPago", is("V-000000000913999"));
+    }
+
+    @Test
+    void unsaacPagoDeudaFlujoCompleto() {
+        given()
+            .contentType(ContentType.JSON)
+            .body("{\"institucion\":\"UNSAAC\",\"operador\":\"PAGO_DEUDA\",\"datos\":{"
+                + "\"filtro\":{\"numeroOperacion\":\"O-000000001760986\"},"
+                + "\"transaccion\":[{\"monto\":\"8.00\","
+                + "\"fechaOperacion\":\"2026-10-31T18:00:00\","
+                + "\"numeroTarjeta\":\"000000XXXXX00000\","
+                + "\"nombreTarjetaHabiente\":\"QUISPE MAMANI THALIA\","
+                + "\"codigoAprobacion\":\"010735\",\"numeroPedido\":\"123456\","
+                + "\"formaPago\":\"VENTANILLA CAJA CUSCO\","
+                + "\"email\":\"171879@unsaac.edu.pe\"}]}}")
+            .when().post("/api/v1/operaciones")
+            .then()
+            .statusCode(200)
+            .body("institucion", is("UNSAAC"))
+            .body("respuesta.codigo", is("00"))
+            .body("respuesta.transaccion[0].identificadorPago", is("V-000000000208456"))
+            .body("respuesta.transaccion[0].clave", is("23300"));
+    }
 }
