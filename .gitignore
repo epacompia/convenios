@@ -1,0 +1,22 @@
+target/
+logs/
+.idea/
+*.iml
+.classpath
+.project
+.settings/
+.vscode/
+
+# Documentacion (no se sube al repositorio)
+*.md
+*.docx
+*.doc
+*.pdf
+*.xlsx
+*.xls
+*.pptx
+*.ppt
+*.odt
+*.ods
+*.csv
+*.txt

@@ -1,0 +1,5 @@
+FROM registry.access.redhat.com/ubi9/ubi-micro
+WORKDIR /work/
+COPY target/*-runner /work/application
+EXPOSE 8080
+ENTRYPOINT ["/work/application"]

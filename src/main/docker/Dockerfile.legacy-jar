@@ -1,0 +1,5 @@
+FROM eclipse-temurin:21-jre
+WORKDIR /deployments
+COPY target/*-runner.jar /deployments/application.jar
+EXPOSE 8080
+ENTRYPOINT ["java","-jar","/deployments/application.jar"]
