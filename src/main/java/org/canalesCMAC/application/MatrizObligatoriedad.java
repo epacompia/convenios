@@ -210,19 +210,20 @@ public class MatrizObligatoriedad {
                 Map.entry(Operador.REIMPRIMIR_TRANSACCION, req(Canonico.ID_LOTE)),
                 Map.entry(Operador.ANULAR_TRANSACCION, List.of())
             )),
-            Map.entry(Institucion.UNIVCONTINENTAL, Map.ofEntries(
+            Map.entry(Institucion.UNIVCONTINENTAL_UNIVERSIDAD, Map.ofEntries(
                 Map.entry(Operador.UNIVERSIDAD_CONSULTA_DEUDA, req(Canonico.CONTRATO)),
                 Map.entry(Operador.UNIVERSIDAD_PAGO_DEUDA, req(Canonico.CONTRATO,
                     Canonico.NUMERO_TRACE, Canonico.FECHA_OPERACION, Canonico.DATOS)),
                 Map.entry(Operador.UNIVERSIDAD_EXTORNO_DEUDA, req(Canonico.CONTRATO,
-                    Canonico.NUMERO_TRACE, Canonico.FECHA_OPERACION)),
+                    Canonico.NUMERO_TRACE, Canonico.FECHA_OPERACION))
+            )),
+            Map.entry(Institucion.UNIVCONTINENTAL_CIDIOMAS, Map.ofEntries(
                 Map.entry(Operador.CENTRO_IDIOMAS_CONSULTA_DEUDA, req(Canonico.CONTRATO)),
                 Map.entry(Operador.CENTRO_IDIOMAS_PAGO_DEUDA, req(Canonico.CONTRATO,
                     Canonico.NUMERO_TRACE, Canonico.FECHA_OPERACION, Canonico.DATOS)),
                 Map.entry(Operador.CENTRO_IDIOMAS_EXTORNO_DEUDA, req(Canonico.CONTRATO,
                     Canonico.NUMERO_TRACE, Canonico.FECHA_OPERACION))
             )),
-
             Map.entry(Institucion.UNSAAC, Map.ofEntries(
                 Map.entry(Operador.CONSULTA_DEUDA, req(Canonico.NUMERO_OPERACION)),
                 Map.entry(Operador.PAGO_DEUDA, mas(req(Canonico.NUMERO_OPERACION,
