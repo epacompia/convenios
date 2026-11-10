@@ -16,11 +16,9 @@ import org.canalesCMAC.domain.model.RecaudacionResponse;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.xml.XmlMapper;
 
 import jakarta.enterprise.context.ApplicationScoped;
-import io.quarkus.logging.Log;
 
 @ApplicationScoped
 public class YaGanasteSoapMessageCodec implements MapeadorOperacion {
