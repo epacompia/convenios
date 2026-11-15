@@ -13,6 +13,7 @@ import org.canalesCMAC.application.port.PeticionSalida;
 import org.canalesCMAC.application.port.ProtocoloCliente;
 import org.canalesCMAC.application.port.RespuestaCruda;
 import org.canalesCMAC.domain.exception.ProveedorException;
+import org.canalesCMAC.infrastructure.logging.RegistroTransacciones;
 import org.jboss.logging.Logger;
 
 import jakarta.inject.Inject;
@@ -26,6 +27,9 @@ public abstract class HttpProtocoloCliente implements ProtocoloCliente {
 
     @Inject
     ConvenioRegistro registro;
+
+    @Inject
+    RegistroTransacciones registroTransacciones;
 
     @Override
     public RespuestaCruda ejecutar(Convenio convenio, PeticionSalida peticion) {
@@ -92,6 +96,8 @@ public abstract class HttpProtocoloCliente implements ProtocoloCliente {
                 ProveedorException.GATEWAY_TIMEOUT, true, causa);
         }
         if (causa instanceof HttpOperationFailedException http) {
+            registroTransacciones.proveedorErrorHttp(convenio.institucion().name(),
+                http.getStatusCode(), http.getResponseBody(), excepcion);
             return new ProveedorException(
                 "El proveedor " + convenio.institucion() + " respondió con estado " + http.getStatusCode(),
                 ProveedorException.BAD_GATEWAY, false, causa);

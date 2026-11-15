@@ -64,7 +64,7 @@ public class ConveniosWireMockResource implements QuarkusTestResourceLifecycleMa
             "http://localhost:" + muniCuscoServer.port() + "/api/servicio");
         propiedades.put("convenio.PAYTOPERU.url", "http://localhost:" + payToPeruServer.port() + "/cmac");
         propiedades.put("convenio.UNSAAC.url",
-            "http://localhost:" + unsaacServer.port() + "/recaudacion");
+            "http://localhost:" + unsaacServer.port() + "/demo-recaudacion");
         propiedades.put("convenio.UNSAAC.claveCifrado", "_aaaae00th@h%h1234");
         return propiedades;
     }
@@ -240,7 +240,7 @@ public class ConveniosWireMockResource implements QuarkusTestResourceLifecycleMa
             + "\"descripción\":\"Matricula pregrado 2022-2\",\"ccp\":\"10012\","
             + "\"conceptos\":[{\"nro\":1,\"codigo\":\"116\","
             + "\"descripcion\":\"Certificacion\",\"valor\":\"20.00\"}]}";
-        unsaacServer.stubFor(post(urlPathEqualTo("/recaudacion/SRVPPConsultaDetallePagoCC"))
+        unsaacServer.stubFor(post(urlPathEqualTo("/demo-recaudacion/SRVPPConsultaDetallePagoCC"))
             .willReturn(aResponse().withStatus(200)
                 .withHeader("Content-Type", "application/json")
                 .withBody(envelope(true, null, "M02", AesCifrado.cifrar(consulta, clave)))));
@@ -248,17 +248,17 @@ public class ConveniosWireMockResource implements QuarkusTestResourceLifecycleMa
         String pago = "{\"codigo_transaccion\":\"O-000000001760986\","
             + "\"codigo_pago\":\"V-000000000208456\",\"clave\":\"23300\","
             + "\"estado\":\"correcto\",\"mensaje\":\"\"}";
-        unsaacServer.stubFor(post(urlPathEqualTo("/recaudacion/SRVPPGuardarPagoCC"))
+        unsaacServer.stubFor(post(urlPathEqualTo("/demo-recaudacion/SRVPPGuardarPagoCC"))
             .willReturn(aResponse().withStatus(200)
                 .withHeader("Content-Type", "application/json")
                 .withBody(envelope(true, null, "M02", AesCifrado.cifrar(pago, clave)))));
 
-        unsaacServer.stubFor(post(urlPathEqualTo("/recaudacion/SRVPPVerificarPagoCC"))
+        unsaacServer.stubFor(post(urlPathEqualTo("/demo-recaudacion/SRVPPVerificarPagoCC"))
             .willReturn(aResponse().withStatus(200)
                 .withHeader("Content-Type", "application/json")
                 .withBody(envelope(true, null, "M02", null))));
 
-        unsaacServer.stubFor(post(urlPathEqualTo("/recaudacion/SRVPPConfirmarPagoCC"))
+        unsaacServer.stubFor(post(urlPathEqualTo("/demo-recaudacion/SRVPPConfirmarPagoCC"))
             .willReturn(aResponse().withStatus(200)
                 .withHeader("Content-Type", "application/json")
                 .withBody(envelope(true, null, "M02", null))));

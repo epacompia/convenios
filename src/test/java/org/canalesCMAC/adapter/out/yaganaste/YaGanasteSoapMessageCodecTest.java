@@ -1,6 +1,7 @@
 package org.canalesCMAC.adapter.out.yaganaste;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.List;
@@ -57,5 +58,75 @@ class YaGanasteSoapMessageCodecTest {
         assertEquals("REF-PROV-1", transaccion.get("referenciaProveedor"));
         assertEquals("REF-OP-1", transaccion.get("referenciaOperador"));
         assertEquals("OK", transaccion.get("estado"));
+    }
+
+    @Test
+    void noIncluyeProductoNiParametrosEnEcho() {
+        RecaudacionRequest peticion = new RecaudacionRequest(
+            Institucion.YAGANASTE, Operador.ECHO, Cabecera.generar(),
+            new Datos(Map.of(), Map.of(), List.of(Map.of(
+                "tpv", "1",
+                "claveTpv", "clave",
+                "codigoProducto", "P1",
+                "referenciaOperacion", "16765",
+                "fechaOperacion", "2026-10-14T10:30:00",
+                "parametrosOperacion", List.of(Map.of("indice", 1, "valor", "x"))))));
+
+        String xml = codec.construir(peticion).contenido();
+
+        assertTrue(xml.contains("<net:echo>"));
+        assertTrue(xml.contains("<referenciaOperacion>16765</referenciaOperacion>"));
+        assertFalse(xml.contains("<codigoProducto>"));
+        assertFalse(xml.contains("<parametrosOperacion>"));
+    }
+
+    @Test
+    void incluyeReferenciaEnSaldoYNormalizaFecha() {
+        RecaudacionRequest peticion = new RecaudacionRequest(
+            Institucion.YAGANASTE, Operador.SALDO, Cabecera.generar(),
+            new Datos(Map.of(), Map.of(), List.of(Map.of(
+                "tpv", "1",
+                "claveTpv", "clave",
+                "referenciaOperacion", "16765",
+                "fechaOperacion", "2026-10-14"))));
+
+        String xml = codec.construir(peticion).contenido();
+
+        assertTrue(xml.contains("<net:saldo>"));
+        assertTrue(xml.contains("<referenciaOperacion>16765</referenciaOperacion>"));
+        assertTrue(xml.contains(
+            "<fechaHoraOperacion>2026-10-14T00:00:00</fechaHoraOperacion>"));
+        assertFalse(xml.contains("<codigoProducto>"));
+    }
+
+    @Test
+    void construyeConsultaEstadoVentaRefFc() {
+        RecaudacionRequest peticion = new RecaudacionRequest(
+            Institucion.YAGANASTE, Operador.CONSULTA_ESTADO_VENTA_REF_FC, Cabecera.generar(),
+            new Datos(Map.of(), Map.of(), List.of(Map.of(
+                "tpv", "1",
+                "claveTpv", "clave",
+                "referenciaOperacion", "16765"))));
+
+        String xml = codec.construir(peticion).contenido();
+
+        assertTrue(xml.contains("<net:consultaEstadoVentaRefFC>"));
+        assertTrue(xml.contains("<referenciaOperacion>16765</referenciaOperacion>"));
+        assertFalse(xml.contains("<codigoProducto>"));
+    }
+
+    @Test
+    void construyeConsultaEstadoVentaRefH2H() {
+        RecaudacionRequest peticion = new RecaudacionRequest(
+            Institucion.YAGANASTE, Operador.CONSULTA_ESTADO_VENTA_REF_H2H, Cabecera.generar(),
+            new Datos(Map.of(), Map.of(), List.of(Map.of(
+                "tpv", "1",
+                "claveTpv", "clave",
+                "referenciaOperacion", "16765"))));
+
+        String xml = codec.construir(peticion).contenido();
+
+        assertTrue(xml.contains("<net:consultaEstadoVentaRefH2H>"));
+        assertTrue(xml.contains("<referenciaOperacion>16765</referenciaOperacion>"));
     }
 }

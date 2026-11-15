@@ -1,5 +1,7 @@
 package org.canalesCMAC.adapter.out.paytoperu;
 
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -26,7 +28,7 @@ import org.jboss.logging.Logger;
 public class PayToPeruCodec implements MapeadorOperacion {
 
     private static final Logger LOG = Logger.getLogger(PayToPeruCodec.class);
-    private static final String CONTENT_TYPE = "application/json";
+    private static final String CONTENT_TYPE = "application/x-www-form-urlencoded";
 
     private final ObjectMapper objectMapper = new ObjectMapper();
 
@@ -60,18 +62,26 @@ public class PayToPeruCodec implements MapeadorOperacion {
                 Mapas.poner(request, "ncodigo_pago", peticion.datos().get(Canonico.CODIGO_PAGO));
                 ruta = "/confirmacion_pago";
             }
-            case CONSULTA_TRANSACCIONES -> {
-                Mapas.poner(request, "dfecha", peticion.datos().get(Canonico.FECHA_OPERACION));
-                ruta = "/consulta_transacciones";
-            }
             default -> throw new OperadorNoSoportadoException(
                 "Operador " + peticion.operador() + " no soportado por PAYTOPERU");
         }
-        try {
-            return new PeticionSalida(objectMapper.writeValueAsString(request), ruta, CONTENT_TYPE);
-        } catch (JsonProcessingException e) {
-            throw new IllegalStateException("Error serializando request de PayToPeru", e);
-        }
+        return new PeticionSalida(formulario(request), ruta, CONTENT_TYPE);
+    }
+
+    private static String formulario(Map<String, Object> campos) {
+        StringBuilder formulario = new StringBuilder();
+        campos.forEach((clave, valor) -> {
+            if (valor == null) {
+                return;
+            }
+            if (formulario.length() > 0) {
+                formulario.append('&');
+            }
+            formulario.append(URLEncoder.encode(clave, StandardCharsets.UTF_8))
+                .append('=')
+                .append(URLEncoder.encode(String.valueOf(valor), StandardCharsets.UTF_8));
+        });
+        return formulario.toString();
     }
 
     @Override

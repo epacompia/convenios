@@ -178,8 +178,14 @@ public class MatrizObligatoriedad {
                     Canonico.CODIGO_PRODUCTO, Canonico.REFERENCIA_OPERACION)),
                 Map.entry(Operador.DEVOLUCION, req(Canonico.TPV, Canonico.CLAVE_TPV,
                     Canonico.CODIGO_PRODUCTO, Canonico.REFERENCIA_OPERACION)),
-                Map.entry(Operador.SALDO, req(Canonico.TPV, Canonico.CLAVE_TPV)),
-                Map.entry(Operador.ECHO, List.of())
+                Map.entry(Operador.SALDO, req(Canonico.TPV, Canonico.CLAVE_TPV,
+                    Canonico.REFERENCIA_OPERACION)),
+                Map.entry(Operador.ECHO, req(Canonico.TPV, Canonico.CLAVE_TPV,
+                    Canonico.REFERENCIA_OPERACION)),
+                Map.entry(Operador.CONSULTA_ESTADO_VENTA_REF_FC,
+                    req(Canonico.TPV, Canonico.CLAVE_TPV, Canonico.REFERENCIA_OPERACION)),
+                Map.entry(Operador.CONSULTA_ESTADO_VENTA_REF_H2H,
+                    req(Canonico.TPV, Canonico.CLAVE_TPV, Canonico.REFERENCIA_OPERACION))
             )),
             Map.entry(Institucion.MUNICIPALIDAD_CUSCO, Map.ofEntries(
                 Map.entry(Operador.RECUPERAR_ORDEN_PAGO, req(Canonico.NUMERO_ORDEN_PAGO)),
@@ -192,8 +198,7 @@ public class MatrizObligatoriedad {
                 Map.entry(Operador.CONSULTA_PAGO, req(Canonico.CODIGO_PAGO, Canonico.DOCUMENTO_CLIENTE)),
                 Map.entry(Operador.NOTIFICACION_PAGO, req(Canonico.CODIGO_PAGO, Canonico.CANAL,
                     Canonico.UBICACION_CANAL, Canonico.MONTO, Canonico.MONEDA, Canonico.FECHA_OPERACION)),
-                Map.entry(Operador.CONFIRMACION_PAGO, req(Canonico.CODIGO_PAGO)),
-                Map.entry(Operador.CONSULTA_TRANSACCIONES, req(Canonico.FECHA_OPERACION))
+                Map.entry(Operador.CONFIRMACION_PAGO, req(Canonico.CODIGO_PAGO))
             )),
             Map.entry(Institucion.WESTERN_UNION, Map.ofEntries(
                 Map.entry(Operador.BUSCAR_PRODUCTO, req(Canonico.ID_AGENTE,

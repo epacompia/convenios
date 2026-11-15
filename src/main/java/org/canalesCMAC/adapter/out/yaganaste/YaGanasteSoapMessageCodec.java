@@ -1,6 +1,10 @@
 package org.canalesCMAC.adapter.out.yaganaste;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -17,6 +21,7 @@ import org.canalesCMAC.domain.exception.ProveedorException;
 import org.canalesCMAC.domain.model.Canonico;
 import org.canalesCMAC.domain.model.Institucion;
 import org.canalesCMAC.domain.model.Mapas;
+import org.canalesCMAC.domain.model.Operador;
 import org.canalesCMAC.domain.model.RecaudacionRequest;
 import org.canalesCMAC.domain.model.RecaudacionResponse;
 import org.jboss.logging.Logger;
@@ -31,6 +36,9 @@ public class YaGanasteSoapMessageCodec implements MapeadorOperacion {
         "http://schemas.xmlsoap.org/soap/envelope/";
 
     private static final String SIGMA_NS = "net.sigma.h2h.ws";
+
+    private static final DateTimeFormatter FORMATO_FECHA_HORA =
+        DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss");
 
     @Override
     public Institucion institucion() {
@@ -54,12 +62,15 @@ public class YaGanasteSoapMessageCodec implements MapeadorOperacion {
 
         agregar(xml, "tpv", campos.get(Canonico.TPV));
         agregar(xml, "claveTpv", campos.get(Canonico.CLAVE_TPV));
-        if (!"saldo".equals(operacion)) {
+        if (requiereProducto(peticion.operador())) {
             agregar(xml, "codigoProducto", campos.get(Canonico.CODIGO_PRODUCTO));
-            agregar(xml, "referenciaOperacion", campos.get(Canonico.REFERENCIA_OPERACION));
         }
-        agregar(xml, "fechaHoraOperacion", campos.get(Canonico.FECHA_OPERACION));
-        agregarParametrosOperacion(xml, campos.get(Canonico.PARAMETROS_OPERACION));
+        agregar(xml, "referenciaOperacion", campos.get(Canonico.REFERENCIA_OPERACION));
+        agregar(xml, "fechaHoraOperacion",
+            fechaHora(campos.get(Canonico.FECHA_OPERACION), peticion.cabecera().fecha()));
+        if (aceptaParametros(peticion.operador())) {
+            agregarParametrosOperacion(xml, campos.get(Canonico.PARAMETROS_OPERACION));
+        }
 
         xml.append("</net:").append(operacion).append(">");
         xml.append("</soapenv:Body>");
@@ -67,7 +78,7 @@ public class YaGanasteSoapMessageCodec implements MapeadorOperacion {
         return new PeticionSalida(xml.toString(), CONTENT_TYPE);
     }
 
-    private String operacionSoap(org.canalesCMAC.domain.model.Operador operador) {
+    private String operacionSoap(Operador operador) {
         return switch (operador) {
             case ECHO -> "echo";
             case VENTA -> "venta";
@@ -75,9 +86,56 @@ public class YaGanasteSoapMessageCodec implements MapeadorOperacion {
             case CONSULTA -> "consulta";
             case CONSULTA_PREVIA -> "consultaPrevia";
             case SALDO -> "saldo";
+            case CONSULTA_ESTADO_VENTA_REF_FC -> "consultaEstadoVentaRefFC";
+            case CONSULTA_ESTADO_VENTA_REF_H2H -> "consultaEstadoVentaRefH2H";
             default -> throw new org.canalesCMAC.domain.exception.OperadorNoSoportadoException(
                 "Operador " + operador + " no soportado por YAGANASTE");
         };
+    }
+
+    private static boolean requiereProducto(Operador operador) {
+        return switch (operador) {
+            case CONSULTA, CONSULTA_PREVIA, VENTA, DEVOLUCION -> true;
+            default -> false;
+        };
+    }
+
+    private static boolean aceptaParametros(Operador operador) {
+        return switch (operador) {
+            case ECHO, SALDO -> false;
+            default -> true;
+        };
+    }
+
+    private static String fechaHora(Object valor, String porDefecto) {
+        String texto = valor == null ? null : valor.toString().trim();
+        if (texto == null || texto.isBlank()) {
+            texto = porDefecto;
+        }
+        if (texto == null || texto.isBlank()) {
+            return null;
+        }
+        try {
+            return OffsetDateTime.parse(texto).format(FORMATO_FECHA_HORA);
+        } catch (RuntimeException ignorado) {
+            // Se intenta con los formatos siguientes.
+        }
+        try {
+            return LocalDateTime.parse(texto).format(FORMATO_FECHA_HORA);
+        } catch (RuntimeException ignorado) {
+            // Se intenta con los formatos siguientes.
+        }
+        try {
+            return LocalDate.parse(texto).atStartOfDay().format(FORMATO_FECHA_HORA);
+        } catch (RuntimeException ignorado) {
+            // Se intenta con el formato compacto.
+        }
+        try {
+            return LocalDate.parse(texto, DateTimeFormatter.BASIC_ISO_DATE)
+                .atStartOfDay().format(FORMATO_FECHA_HORA);
+        } catch (RuntimeException ignorado) {
+            return texto;
+        }
     }
 
     private Map<String, Object> campos(RecaudacionRequest peticion) {
