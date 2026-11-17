@@ -52,7 +52,7 @@ public class UnsAacCodec implements MapeadorOperacion {
     ObjectMapper objectMapper;
 
     @ConfigProperty(name = "convenio.UNSAAC.claveCifrado",
-        defaultValue = "xaadaippth@@%m5678")
+        defaultValue = "_aaaae00th@h%h1234")
     String claveCifrado;
 
     public UnsAacCodec() {
