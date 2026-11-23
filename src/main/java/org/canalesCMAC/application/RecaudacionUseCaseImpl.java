@@ -15,9 +15,11 @@ import org.canalesCMAC.domain.model.RecaudacionResponse;
 import org.canalesCMAC.infrastructure.cache.IdempotenciaRedis;
 import org.canalesCMAC.infrastructure.persistence.AuditoriaRecaudacion;
 import org.canalesCMAC.infrastructure.persistence.IdempotenciaDurable;
+import org.canalesCMAC.infrastructure.logging.RegistroTransacciones;
 import org.canalesCMAC.infrastructure.persistence.LogPersistente;
 import org.canalesCMAC.infrastructure.persistence.RecaudacionIdempotencia;
 import org.jboss.logging.Logger;
+import org.jboss.logging.MDC;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -52,6 +54,9 @@ public class RecaudacionUseCaseImpl implements RecaudacionUseCase {
     LogPersistente logs;
 
     @Inject
+    RegistroTransacciones registroTransacciones;
+
+    @Inject
     ObjectMapper objectMapper;
 
     @Override
@@ -60,10 +65,14 @@ public class RecaudacionUseCaseImpl implements RecaudacionUseCase {
         String idTransaccion = solicitud.cabecera().idTransaccion();
         String institucion = solicitud.institucion().name();
         String operador = solicitud.operador().name();
+        MDC.put("recaudacion.idTransaccion", idTransaccion);
+        MDC.put("recaudacion.operacion", operador);
         LOG.debugf("inicio de recaudacion institucion=%s operador=%s idTransaccion=%s",
             institucion, operador, idTransaccion);
         logs.registrar("INFO", RecaudacionUseCaseImpl.class.getName(),
             "inicio de recaudacion", idTransaccion, idTransaccion, institucion, operador, null);
+        registroTransacciones.inicio(solicitud);
+        registroTransacciones.solicitud(solicitud);
 
         try {
             resolver.validar(solicitud.institucion(), solicitud.operador());
@@ -76,6 +85,7 @@ public class RecaudacionUseCaseImpl implements RecaudacionUseCase {
                 RecaudacionResponse recuperada = leer(cache.get());
                 if (recuperada != null) {
                     LOG.infof("recaudacion idempotente en redis idTransaccion=%s", idTransaccion);
+                    registroTransacciones.respuesta(solicitud, recuperada, milisegundos(inicio));
                     return recuperada;
                 }
             }
@@ -93,6 +103,7 @@ public class RecaudacionUseCaseImpl implements RecaudacionUseCase {
                     if (recuperada != null) {
                         idempotencia.guardar(clave, registro.responseJson);
                         LOG.infof("recaudacion idempotente durable idTransaccion=%s", idTransaccion);
+                        registroTransacciones.respuesta(solicitud, recuperada, milisegundos(inicio));
                         return recuperada;
                     }
                     idempotenciaDurable.marcarError(idTransaccion);
@@ -112,6 +123,7 @@ public class RecaudacionUseCaseImpl implements RecaudacionUseCase {
                     RecaudacionResponse recuperada = leer(otra.get().responseJson);
                     if (recuperada != null) {
                         idempotencia.guardar(clave, otra.get().responseJson);
+                        registroTransacciones.respuesta(solicitud, recuperada, milisegundos(inicio));
                         return recuperada;
                     }
                 }
@@ -133,6 +145,7 @@ public class RecaudacionUseCaseImpl implements RecaudacionUseCase {
                 idempotencia.guardar(clave, responseJson);
 
                 long duracionMs = milisegundos(inicio);
+                registroTransacciones.respuesta(solicitud, respuesta, duracionMs);
                 auditoria.registrar(solicitud, respuesta, duracionMs);
                 logs.registrar("INFO", RecaudacionUseCaseImpl.class.getName(),
                     "recaudacion completada codigo=" + respuesta.codigo(),
@@ -146,18 +159,24 @@ public class RecaudacionUseCaseImpl implements RecaudacionUseCase {
                 throw e;
             }
         } catch (RuntimeException e) {
-            auditarError(solicitud, e, milisegundos(inicio));
+            long duracionMs = milisegundos(inicio);
+            RecaudacionResponse respuestaError = RecaudacionResponse.error(
+                solicitud.institucion(), solicitud.operador(), solicitud.cabecera(),
+                e.getMessage() == null ? "Error en la operación" : e.getMessage());
+            registroTransacciones.error(solicitud, respuestaError, e, duracionMs);
+            auditarError(solicitud, respuestaError, duracionMs);
             logs.registrar("ERROR", RecaudacionUseCaseImpl.class.getName(),
                 e.getMessage(), idTransaccion, idTransaccion, institucion, operador, null);
             throw e;
+        } finally {
+            MDC.remove("recaudacion.idTransaccion");
+            MDC.remove("recaudacion.operacion");
         }
     }
 
-    private void auditarError(RecaudacionRequest solicitud, RuntimeException error, long duracionMs) {
+    private void auditarError(RecaudacionRequest solicitud, RecaudacionResponse respuesta,
+                              long duracionMs) {
         try {
-            RecaudacionResponse respuesta = RecaudacionResponse.error(
-                solicitud.institucion(), solicitud.operador(), solicitud.cabecera(),
-                error.getMessage() == null ? "Error en la operación" : error.getMessage());
             auditoria.registrar(solicitud, respuesta, duracionMs);
         } catch (RuntimeException e) {
             LOG.warnf("no se pudo auditar el error idTransaccion=%s: %s",

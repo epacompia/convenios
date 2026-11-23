@@ -16,6 +16,7 @@ import org.canalesCMAC.domain.exception.ProveedorException;
 import org.canalesCMAC.domain.model.Institucion;
 import org.canalesCMAC.domain.model.RecaudacionRequest;
 import org.canalesCMAC.domain.model.RecaudacionResponse;
+import org.canalesCMAC.infrastructure.logging.RegistroTransacciones;
 import org.jboss.logging.Logger;
 
 import jakarta.annotation.PostConstruct;
@@ -42,6 +43,9 @@ public class ConvenioOrquestador {
 
     @Inject
     CatalogoCodigos catalogo;
+
+    @Inject
+    RegistroTransacciones registroTransacciones;
 
     private Map<Institucion, MapeadorOperacion> mapeadoresPorInstitucion;
     private Map<String, ProtocoloCliente> clientesPorProtocolo;
@@ -96,7 +100,16 @@ public class ConvenioOrquestador {
             peticion.institucion(), peticion.operador(), convenio.protocolo(),
             peticion.cabecera().idTransaccion());
         PeticionSalida salida = mapeador.construir(peticion);
-        RespuestaCruda respuesta = resiliencia.ejecutar(cliente, convenio, salida, peticion);
+        registroTransacciones.proveedorSolicitud(peticion, salida,
+            convenio.url() + salida.ruta());
+        RespuestaCruda respuesta;
+        try {
+            respuesta = resiliencia.ejecutar(cliente, convenio, salida, peticion);
+        } catch (RuntimeException e) {
+            registroTransacciones.proveedorError(peticion, e);
+            throw e;
+        }
+        registroTransacciones.proveedorRespuesta(peticion, respuesta);
         try {
             RecaudacionResponse interpretada = mapeador.interpretar(respuesta, peticion);
             return normalizar(conCabecera(interpretada, peticion));
