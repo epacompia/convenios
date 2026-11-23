@@ -5,7 +5,7 @@ import org.canalesCMAC.domain.model.Institucion;
 import jakarta.enterprise.context.ApplicationScoped;
 
 @ApplicationScoped
-public class PagoIdiomasMessageCodec extends AbstractUnivContinentalCodec{
+public class PagoIdiomasMessageCodec extends AbstractUnivContinentalCodec {
 
     @Override
     public Institucion institucion() {
@@ -16,5 +16,4 @@ public class PagoIdiomasMessageCodec extends AbstractUnivContinentalCodec{
     protected String rutaBase() {
         return "/api/pagoidiomas";
     }
-
 }
