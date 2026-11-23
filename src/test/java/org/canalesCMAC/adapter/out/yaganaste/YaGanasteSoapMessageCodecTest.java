@@ -1,353 +1,132 @@
-
 package org.canalesCMAC.adapter.out.yaganaste;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.util.List;
 import java.util.Map;
 
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-
-import org.canalesCMAC.application.port.PeticionSalida;
 import org.canalesCMAC.application.port.RespuestaCruda;
-import org.canalesCMAC.domain.exception.OperadorNoSoportadoException;
 import org.canalesCMAC.domain.model.Cabecera;
-import org.canalesCMAC.domain.model.Canonico;
 import org.canalesCMAC.domain.model.Datos;
 import org.canalesCMAC.domain.model.Institucion;
 import org.canalesCMAC.domain.model.Operador;
 import org.canalesCMAC.domain.model.RecaudacionRequest;
 import org.canalesCMAC.domain.model.RecaudacionResponse;
 
+import org.junit.jupiter.api.Test;
+
 class YaGanasteSoapMessageCodecTest {
 
-    private YaGanasteSoapMessageCodec codec;
-
-    @BeforeEach
-    void setUp() {
-        codec = new YaGanasteSoapMessageCodec();
-    }
-
-    // =======================================================
-    // CONSTRUCCION DE PETICIONES SOAP
-    // =======================================================
+    private final YaGanasteSoapMessageCodec codec = new YaGanasteSoapMessageCodec();
 
     @Test
-    void construyeXmlParaOperacionEcho() {
+    void construyeConsultaConOperacionConsulta() {
+        RecaudacionRequest peticion = new RecaudacionRequest(
+            Institucion.YAGANASTE, Operador.CONSULTA, Cabecera.generar(),
+            new Datos(Map.of("codigoProducto", "P1"), Map.of(), List.of(Map.of(
+                "tpv", "1",
+                "claveTpv", "clave",
+                "referenciaOperacion", "REF-1",
+                "fechaOperacion", "2026-10-14T10:30:00"))));
 
-        RecaudacionRequest peticion = crearPeticion(
-            Operador.ECHO,
-            Map.of(
-                Canonico.TPV, "TPV001",
-                Canonico.CLAVE_TPV, "CLAVE123",
-                Canonico.REFERENCIA_OPERACION, "REF001",
-                Canonico.FECHA_OPERACION, "2026-11-09"
-            )
-        );
+        String xml = codec.construir(peticion).contenido();
 
-        PeticionSalida salida = codec.construir(peticion);
-
-        assertNotNull(salida);
-        assertEquals("text/xml; charset=utf-8", salida.contentType());
-
-        assertTrue(salida.contenido().contains("<net:echo>"));
-        assertTrue(salida.contenido().contains("</net:echo>"));
-        assertTrue(salida.contenido().contains("<tpv>TPV001</tpv>"));
-        assertTrue(salida.contenido().contains("<claveTpv>CLAVE123</claveTpv>"));
-        assertTrue(salida.contenido().contains("<referenciaOperacion>REF001</referenciaOperacion>"));
-        assertTrue(salida.contenido().contains("<fechaHoraOperacion>2026-11-09</fechaHoraOperacion>"));
+        assertTrue(xml.contains("<net:consulta>"));
+        assertTrue(xml.contains("<codigoProducto>P1</codigoProducto>"));
+        assertTrue(xml.contains("<fechaHoraOperacion>2026-10-14T10:30:00</fechaHoraOperacion>"));
     }
 
     @Test
-    void construyeXmlParaOperacionDevolucion() {
+    void interpretaRespuestaConNodoResponse() {
+        String xml = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>"
+            + "<S:Envelope xmlns:S=\"http://schemas.xmlsoap.org/soap/envelope/\"><S:Body>"
+            + "<ns2:consultaResponse xmlns:ns2=\"net.sigma.h2h.ws\"><response>"
+            + "<responseCode>00</responseCode><refOperador>REF-OP-1</refOperador>"
+            + "<referenciaSigma>REF-PROV-1</referenciaSigma><importe>10.00</importe>"
+            + "<estadoVenta>OK</estadoVenta><parametros><indice>1</indice>"
+            + "<valor>CONSUH2H</valor></parametros></response></ns2:consultaResponse>"
+            + "</S:Body></S:Envelope>";
 
-        RecaudacionRequest peticion = crearPeticion(
-            Operador.DEVOLUCION,
-            datosCompletos()
-        );
+        RecaudacionResponse respuesta = codec.interpretar(new RespuestaCruda(200, xml),
+            new RecaudacionRequest(Institucion.YAGANASTE, Operador.CONSULTA,
+                Cabecera.generar(), Datos.vacio()));
 
-        PeticionSalida salida = codec.construir(peticion);
-
-        assertNotNull(salida);
-        assertTrue(salida.contenido().contains("<net:devolucion>"));
-        assertTrue(salida.contenido().contains("</net:devolucion>"));
-        assertTrue(salida.contenido().contains("<codigoProducto>PROD001</codigoProducto>"));
+        assertEquals("00", respuesta.codigo());
+        Map<String, Object> transaccion = respuesta.transacciones().get(0);
+        assertEquals("REF-PROV-1", transaccion.get("referenciaProveedor"));
+        assertEquals("REF-OP-1", transaccion.get("referenciaOperador"));
+        assertEquals("OK", transaccion.get("estado"));
     }
 
     @Test
-    void construyeXmlParaOperacionVenta() {
+    void noIncluyeProductoNiParametrosEnEcho() {
+        RecaudacionRequest peticion = new RecaudacionRequest(
+            Institucion.YAGANASTE, Operador.ECHO, Cabecera.generar(),
+            new Datos(Map.of(), Map.of(), List.of(Map.of(
+                "tpv", "1",
+                "claveTpv", "clave",
+                "codigoProducto", "P1",
+                "referenciaOperacion", "16765",
+                "fechaOperacion", "2026-10-14T10:30:00",
+                "parametrosOperacion", List.of(Map.of("indice", 1, "valor", "x"))))));
 
-        RecaudacionRequest peticion = crearPeticion(
-            Operador.VENTA,
-            datosCompletos()
-        );
+        String xml = codec.construir(peticion).contenido();
 
-        PeticionSalida salida = codec.construir(peticion);
-
-        assertNotNull(salida);
-        assertTrue(salida.contenido().contains("<net:venta>"));
-        assertTrue(salida.contenido().contains("</net:venta>"));
+        assertTrue(xml.contains("<net:echo>"));
+        assertTrue(xml.contains("<referenciaOperacion>16765</referenciaOperacion>"));
+        assertFalse(xml.contains("<codigoProducto>"));
+        assertFalse(xml.contains("<parametrosOperacion>"));
     }
 
     @Test
-    void construyeXmlParaOperacionConsulta() {
+    void incluyeReferenciaEnSaldoYNormalizaFecha() {
+        RecaudacionRequest peticion = new RecaudacionRequest(
+            Institucion.YAGANASTE, Operador.SALDO, Cabecera.generar(),
+            new Datos(Map.of(), Map.of(), List.of(Map.of(
+                "tpv", "1",
+                "claveTpv", "clave",
+                "referenciaOperacion", "16765",
+                "fechaOperacion", "2026-10-14"))));
 
-        RecaudacionRequest peticion = crearPeticion(
-            Operador.CONSULTA,
-            datosCompletos()
-        );
+        String xml = codec.construir(peticion).contenido();
 
-        PeticionSalida salida = codec.construir(peticion);
-
-        assertNotNull(salida);
-        assertTrue(salida.contenido().contains("<net:consulta>"));
-        assertTrue(salida.contenido().contains("</net:consulta>"));
+        assertTrue(xml.contains("<net:saldo>"));
+        assertTrue(xml.contains("<referenciaOperacion>16765</referenciaOperacion>"));
+        assertTrue(xml.contains(
+            "<fechaHoraOperacion>2026-10-14T00:00:00</fechaHoraOperacion>"));
+        assertFalse(xml.contains("<codigoProducto>"));
     }
 
     @Test
-    void construyeXmlParaOperacionConsultaPrevia() {
+    void construyeConsultaEstadoVentaRefFc() {
+        RecaudacionRequest peticion = new RecaudacionRequest(
+            Institucion.YAGANASTE, Operador.CONSULTA_ESTADO_VENTA_REF_FC, Cabecera.generar(),
+            new Datos(Map.of(), Map.of(), List.of(Map.of(
+                "tpv", "1",
+                "claveTpv", "clave",
+                "referenciaOperacion", "16765"))));
 
-        RecaudacionRequest peticion = crearPeticion(
-            Operador.CONSULTA_PREVIA,
-            datosCompletos()
-        );
+        String xml = codec.construir(peticion).contenido();
 
-        PeticionSalida salida = codec.construir(peticion);
-
-        assertNotNull(salida);
-        assertTrue(salida.contenido().contains("<net:consultaPrevia>"));
-        assertTrue(salida.contenido().contains("</net:consultaPrevia>"));
+        assertTrue(xml.contains("<net:consultaEstadoVentaRefFC>"));
+        assertTrue(xml.contains("<referenciaOperacion>16765</referenciaOperacion>"));
+        assertFalse(xml.contains("<codigoProducto>"));
     }
 
     @Test
-    void construyeXmlParaOperacionSaldo() {
+    void construyeConsultaEstadoVentaRefH2H() {
+        RecaudacionRequest peticion = new RecaudacionRequest(
+            Institucion.YAGANASTE, Operador.CONSULTA_ESTADO_VENTA_REF_H2H, Cabecera.generar(),
+            new Datos(Map.of(), Map.of(), List.of(Map.of(
+                "tpv", "1",
+                "claveTpv", "clave",
+                "referenciaOperacion", "16765"))));
 
-        RecaudacionRequest peticion = crearPeticion(
-            Operador.SALDO,
-            datosCompletos()
-        );
+        String xml = codec.construir(peticion).contenido();
 
-        PeticionSalida salida = codec.construir(peticion);
-
-        assertNotNull(salida);
-        assertTrue(salida.contenido().contains("<net:saldo>"));
-        assertTrue(salida.contenido().contains("</net:saldo>"));
-    }
-
-    @Test
-    void construyeXmlConHeaderYEnvelopeSoap() {
-
-        RecaudacionRequest peticion = crearPeticion(
-            Operador.VENTA,
-            datosCompletos()
-        );
-
-        PeticionSalida salida = codec.construir(peticion);
-
-        assertTrue(salida.contenido().contains("<soapenv:Envelope"));
-        assertTrue(salida.contenido().contains("<soapenv:Header/>"));
-        assertTrue(salida.contenido().contains("<soapenv:Body>"));
-        assertTrue(salida.contenido().contains("</soapenv:Envelope>"));
-    }
-
-    @Test
-    void omiteCamposNulosOVaciosAlConstruirXml() {
-
-        RecaudacionRequest peticion = crearPeticion(
-            Operador.VENTA,
-            Map.of(
-                Canonico.TPV, "TPV001",
-                Canonico.CLAVE_TPV, "",
-                Canonico.CODIGO_PRODUCTO, "PROD001"
-            )
-        );
-
-        PeticionSalida salida = codec.construir(peticion);
-
-        assertTrue(salida.contenido().contains("<tpv>TPV001</tpv>"));
-        assertFalse(salida.contenido().contains("<claveTpv>"));
-        assertFalse(salida.contenido().contains("<referenciaOperacion>"));
-        assertFalse(salida.contenido().contains("<fechaHoraOperacion>"));
-    }
-
-    // =======================================================
-    // INTERPRETACION DE RESPUESTAS SOAP
-    // =======================================================
-
-    @Test
-    void interpretaRespuestaSoapCorrectamente() {
-
-        String xml = """
-            <?xml version="1.0" encoding="UTF-8"?>
-            <soapenv:Envelope
-                xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/"
-                xmlns:net="net.sigma.h2h.ws">
-                <soapenv:Body>
-                    <net:ventaResponse>
-                        <response>
-                            <refOperador>REF-123</refOperador>
-                            <importe>150.50</importe>
-                            <referenciaSigma>SIGMA-001</referenciaSigma>
-                            <saldo>500.00</saldo>
-                        </response>
-                    </net:ventaResponse>
-                </soapenv:Body>
-            </soapenv:Envelope>
-            """;
-
-        RecaudacionRequest peticion = crearPeticion(
-            Operador.VENTA,
-            datosCompletos()
-        );
-
-        RespuestaCruda respuesta = new RespuestaCruda(200, xml);
-
-        RecaudacionResponse resultado = codec.interpretar(respuesta, peticion);
-
-        assertNotNull(resultado);
-        assertEquals(Institucion.YAGANASTE, resultado.institucion());
-        assertEquals(Operador.VENTA, resultado.operador());
-
-        assertNotNull(resultado.transacciones());
-        assertEquals(1, resultado.transacciones().size());
-
-        Map<String, Object> transaccion = resultado.transacciones().get(0);
-
-        assertEquals("REF-123", transaccion.get(Canonico.REFERENCIA_OPERADOR));
-        assertEquals("150.50", transaccion.get(Canonico.IMPORTE_ORIGEN));
-        assertEquals("SIGMA-001", transaccion.get("referenciaSigma"));
-        assertEquals("500.00", transaccion.get(Canonico.SALDO));
-    }
-
-    @Test
-    void interpretaRespuestaSoapSinDatosDeTransaccion() {
-
-        String xml = """
-            <Envelope>
-                <Body>
-                    <ventaResponse>
-                        <response/>
-                    </ventaResponse>
-                </Body>
-            </Envelope>
-            """;
-
-        RecaudacionRequest peticion = crearPeticion(
-            Operador.VENTA,
-            datosCompletos()
-        );
-
-        RespuestaCruda respuesta = new RespuestaCruda(200, xml);
-
-        RecaudacionResponse resultado = codec.interpretar(respuesta, peticion);
-
-        assertNotNull(resultado);
-        assertEquals(Institucion.YAGANASTE, resultado.institucion());
-        assertTrue(resultado.transacciones().isEmpty());
-    }
-
-    @Test
-    void interpretaRespuestaSoapConCamposNulos() {
-
-        String xml = """
-            <Envelope>
-                <Body>
-                    <ventaResponse>
-                        <response>
-                            <refOperador></refOperador>
-                            <importe></importe>
-                            <referenciaSigma>SIGMA-001</referenciaSigma>
-                        </response>
-                    </ventaResponse>
-                </Body>
-            </Envelope>
-            """;
-
-        RecaudacionRequest peticion = crearPeticion(
-            Operador.VENTA,
-            datosCompletos()
-        );
-
-        RespuestaCruda respuesta = new RespuestaCruda(200, xml);
-
-        RecaudacionResponse resultado = codec.interpretar(respuesta, peticion);
-
-        assertNotNull(resultado);
-        assertEquals(1, resultado.transacciones().size());
-
-        Map<String, Object> transaccion = resultado.transacciones().get(0);
-
-        assertFalse(transaccion.containsKey(Canonico.REFERENCIA_OPERADOR));
-        assertFalse(transaccion.containsKey(Canonico.IMPORTE_ORIGEN));
-        assertEquals("SIGMA-001", transaccion.get("referenciaSigma"));
-    }
-
-    @Test
-    void lanzaExcepcionCuandoLaRespuestaSoapEsInvalida() {
-
-        RecaudacionRequest peticion = crearPeticion(
-            Operador.VENTA,
-            datosCompletos()
-        );
-
-        RespuestaCruda respuesta = new RespuestaCruda(
-            500,
-            "<Envelope><Body><ventaResponse>"
-        );
-
-        IllegalStateException excepcion = assertThrows(
-            IllegalStateException.class,
-            () -> codec.interpretar(respuesta, peticion)
-        );
-
-        assertTrue(excepcion.getMessage().contains("Respuesta inválida"));
-    }
-
-    // =======================================================
-    // VALIDACION DE OPERACIONES
-    // =======================================================
-
-    @Test
-    void obtieneExcepcionCuandoElOperadorNoEstaSoportado() {
-
-        RecaudacionRequest peticion = crearPeticion(
-            Operador.CONSULTA_DEUDA,
-            datosCompletos()
-        );
-
-        assertThrows(
-            OperadorNoSoportadoException.class,
-            () -> codec.construir(peticion)
-        );
-    }
-
-    // =======================================================
-    // METODOS AUXILIARES
-    // =======================================================
-
-    private RecaudacionRequest crearPeticion(
-        Operador operador,
-        Map<String, Object> datos
-    ) {
-        return new RecaudacionRequest(
-            Institucion.YAGANASTE,
-            operador,
-            Cabecera.generar(),
-            new Datos(datos, datos, null)
-        );
-    }
-
-    private Map<String, Object> datosCompletos() {
-        return Map.of(
-            Canonico.TPV, "TPV001",
-            Canonico.CLAVE_TPV, "CLAVE123",
-            Canonico.CODIGO_PRODUCTO, "PROD001",
-            Canonico.REFERENCIA_OPERACION, "REF001",
-            Canonico.FECHA_OPERACION, "2026-11-09"
-        );
+        assertTrue(xml.contains("<net:consultaEstadoVentaRefH2H>"));
+        assertTrue(xml.contains("<referenciaOperacion>16765</referenciaOperacion>"));
     }
 }

@@ -1,175 +1,284 @@
 package org.canalesCMAC.adapter.out.yaganaste;
 
+import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
+import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
+import jakarta.enterprise.context.ApplicationScoped;
+
+import org.canalesCMAC.adapter.out.soap.NodoXml;
+import org.canalesCMAC.adapter.out.soap.SoapSupport;
 import org.canalesCMAC.application.port.MapeadorOperacion;
 import org.canalesCMAC.application.port.PeticionSalida;
 import org.canalesCMAC.application.port.RespuestaCruda;
-import org.canalesCMAC.domain.exception.OperadorNoSoportadoException;
+import org.canalesCMAC.domain.exception.ProveedorException;
 import org.canalesCMAC.domain.model.Canonico;
 import org.canalesCMAC.domain.model.Institucion;
 import org.canalesCMAC.domain.model.Mapas;
+import org.canalesCMAC.domain.model.Operador;
 import org.canalesCMAC.domain.model.RecaudacionRequest;
 import org.canalesCMAC.domain.model.RecaudacionResponse;
-
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.dataformat.xml.XmlMapper;
-
-import jakarta.enterprise.context.ApplicationScoped;
+import org.jboss.logging.Logger;
 
 @ApplicationScoped
 public class YaGanasteSoapMessageCodec implements MapeadorOperacion {
 
+    private static final Logger LOG = Logger.getLogger(YaGanasteSoapMessageCodec.class);
     private static final String CONTENT_TYPE = "text/xml; charset=utf-8";
-    private static final String SOAP_NS = "http://schemas.xmlsoap.org/soap/envelope/";
-    private static final String SIGMA_NS ="net.sigma.h2h.ws";
+
+    private static final String SOAP_NS =
+        "http://schemas.xmlsoap.org/soap/envelope/";
+
+    private static final String SIGMA_NS = "net.sigma.h2h.ws";
+
+    private static final DateTimeFormatter FORMATO_FECHA_HORA =
+        DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss");
 
     @Override
     public Institucion institucion() {
-         return Institucion.YAGANASTE;
+        return Institucion.YAGANASTE;
     }
 
     @Override
     public PeticionSalida construir(RecaudacionRequest peticion) {
-        String operacion = peticion.operador().name();
-        YaGanasteTag yaGanasteTag = obtenerOperacion(operacion);
-        StringBuilder xml = new StringBuilder();
+        LOG.debugf("construyendo SOAP YAGANASTE operador=%s", peticion.operador());
+        String operacion = operacionSoap(peticion.operador());
+        Map<String, Object> campos = campos(peticion);
 
+        StringBuilder xml = new StringBuilder();
         xml.append("<?xml version=\"1.0\" encoding=\"UTF-8\"?>");
         xml.append("<soapenv:Envelope")
-           .append(" xmlns:soapenv=\"").append(SOAP_NS).append("\"")
-           .append(" xmlns:net=\"").append(SIGMA_NS).append("\">");
+            .append(" xmlns:soapenv=\"").append(SOAP_NS).append("\"")
+            .append(" xmlns:net=\"").append(SIGMA_NS).append("\">");
         xml.append("<soapenv:Header/>");
         xml.append("<soapenv:Body>");
-        xml.append("<net:").append(yaGanasteTag.getTagOperacion()).append(">");
+        xml.append("<net:").append(operacion).append(">");
 
-        if("ECHO".equals(operacion)){
-            poner(xml, "tpv", peticion, Canonico.TPV);
-            poner(xml, "claveTpv", peticion, Canonico.CLAVE_TPV);
-            poner(xml, "referenciaOperacion", peticion, Canonico.REFERENCIA_OPERACION);
-            poner(xml, "fechaHoraOperacion", peticion, Canonico.FECHA_OPERACION);
-        } else if("DEVOLUCION".equals(operacion)){
-            poner(xml, "tpv", peticion, Canonico.TPV);
-            poner(xml, "claveTpv", peticion, Canonico.CLAVE_TPV);
-            poner(xml, "codigoProducto", peticion, Canonico.CODIGO_PRODUCTO);
-            poner(xml, "referenciaOperacion", peticion, Canonico.REFERENCIA_OPERACION);
-            poner(xml, "fechaHoraOperacion", peticion, Canonico.FECHA_OPERACION);
-        } else if("VENTA".equals(operacion)){
-            poner(xml, "tpv", peticion, Canonico.TPV);
-            poner(xml, "claveTpv", peticion, Canonico.CLAVE_TPV);
-            poner(xml, "codigoProducto", peticion, Canonico.CODIGO_PRODUCTO);
-            poner(xml, "referenciaOperacion", peticion, Canonico.REFERENCIA_OPERACION);
-            poner(xml, "fechaHoraOperacion", peticion, Canonico.FECHA_OPERACION);
-        } else if("CONSULTA".equals(operacion)){
-            poner(xml, "tpv", peticion, Canonico.TPV);
-            poner(xml, "claveTpv", peticion, Canonico.CLAVE_TPV);
-            poner(xml, "codigoProducto", peticion, Canonico.CODIGO_PRODUCTO);
-            poner(xml, "referenciaOperacion", peticion, Canonico.REFERENCIA_OPERACION);
-            poner(xml, "fechaHoraOperacion", peticion, Canonico.FECHA_OPERACION);
-        } else if("CONSULTA_PREVIA".equals(operacion)){
-            poner(xml, "tpv", peticion, Canonico.TPV);
-            poner(xml, "claveTpv", peticion, Canonico.CLAVE_TPV);
-            poner(xml, "codigoProducto", peticion, Canonico.CODIGO_PRODUCTO);
-            poner(xml, "referenciaOperacion", peticion, Canonico.REFERENCIA_OPERACION);
-            poner(xml, "fechaHoraOperacion", peticion, Canonico.FECHA_OPERACION);
-        } else if("SALDO".equals(operacion)){
-            poner(xml, "tpv", peticion, Canonico.TPV);
-            poner(xml, "claveTpv", peticion, Canonico.CLAVE_TPV);
-            poner(xml, "codigoProducto", peticion, Canonico.CODIGO_PRODUCTO);
-            poner(xml, "referenciaOperacion", peticion, Canonico.REFERENCIA_OPERACION);
-            poner(xml, "fechaHoraOperacion", peticion, Canonico.FECHA_OPERACION);
-        } else {
-            throw new OperadorNoSoportadoException(
-                "Operador " + peticion.operador() + " no soportado por " + institucion());            
+        agregar(xml, "tpv", campos.get(Canonico.TPV));
+        agregar(xml, "claveTpv", campos.get(Canonico.CLAVE_TPV));
+        if (requiereProducto(peticion.operador())) {
+            agregar(xml, "codigoProducto", campos.get(Canonico.CODIGO_PRODUCTO));
+        }
+        agregar(xml, "referenciaOperacion", campos.get(Canonico.REFERENCIA_OPERACION));
+        agregar(xml, "fechaHoraOperacion",
+            fechaHora(campos.get(Canonico.FECHA_OPERACION), peticion.cabecera().fecha()));
+        if (aceptaParametros(peticion.operador())) {
+            agregarParametrosOperacion(xml, campos.get(Canonico.PARAMETROS_OPERACION));
         }
 
-        xml.append("</net:").append(yaGanasteTag.getTagOperacion()).append(">");
+        xml.append("</net:").append(operacion).append(">");
         xml.append("</soapenv:Body>");
         xml.append("</soapenv:Envelope>");
-
         return new PeticionSalida(xml.toString(), CONTENT_TYPE);
+    }
+
+    private String operacionSoap(Operador operador) {
+        return switch (operador) {
+            case ECHO -> "echo";
+            case VENTA -> "venta";
+            case DEVOLUCION -> "devolucion";
+            case CONSULTA -> "consulta";
+            case CONSULTA_PREVIA -> "consultaPrevia";
+            case SALDO -> "saldo";
+            case CONSULTA_ESTADO_VENTA_REF_FC -> "consultaEstadoVentaRefFC";
+            case CONSULTA_ESTADO_VENTA_REF_H2H -> "consultaEstadoVentaRefH2H";
+            default -> throw new org.canalesCMAC.domain.exception.OperadorNoSoportadoException(
+                "Operador " + operador + " no soportado por YAGANASTE");
+        };
+    }
+
+    private static boolean requiereProducto(Operador operador) {
+        return switch (operador) {
+            case CONSULTA, CONSULTA_PREVIA, VENTA, DEVOLUCION -> true;
+            default -> false;
+        };
+    }
+
+    private static boolean aceptaParametros(Operador operador) {
+        return switch (operador) {
+            case ECHO, SALDO -> false;
+            default -> true;
+        };
+    }
+
+    private static String fechaHora(Object valor, String porDefecto) {
+        String texto = valor == null ? null : valor.toString().trim();
+        if (texto == null || texto.isBlank()) {
+            texto = porDefecto;
+        }
+        if (texto == null || texto.isBlank()) {
+            return null;
+        }
+        try {
+            return OffsetDateTime.parse(texto).format(FORMATO_FECHA_HORA);
+        } catch (RuntimeException ignorado) {
+            // Se intenta con los formatos siguientes.
+        }
+        try {
+            return LocalDateTime.parse(texto).format(FORMATO_FECHA_HORA);
+        } catch (RuntimeException ignorado) {
+            // Se intenta con los formatos siguientes.
+        }
+        try {
+            return LocalDate.parse(texto).atStartOfDay().format(FORMATO_FECHA_HORA);
+        } catch (RuntimeException ignorado) {
+            // Se intenta con el formato compacto.
+        }
+        try {
+            return LocalDate.parse(texto, DateTimeFormatter.BASIC_ISO_DATE)
+                .atStartOfDay().format(FORMATO_FECHA_HORA);
+        } catch (RuntimeException ignorado) {
+            return texto;
+        }
+    }
+
+    private Map<String, Object> campos(RecaudacionRequest peticion) {
+        Map<String, Object> campos = new LinkedHashMap<>();
+        poner(campos, Canonico.TPV, peticion, Canonico.TPV);
+        poner(campos, Canonico.CLAVE_TPV, peticion, Canonico.CLAVE_TPV);
+        poner(campos, Canonico.CODIGO_PRODUCTO, peticion, Canonico.CODIGO_PRODUCTO);
+        poner(campos, Canonico.REFERENCIA_OPERACION, peticion, Canonico.REFERENCIA_OPERACION);
+        poner(campos, Canonico.FECHA_OPERACION, peticion, Canonico.FECHA_OPERACION);
+        Object parametros = peticion.datos().get(Canonico.PARAMETROS_OPERACION);
+        if (parametros != null) {
+            campos.put(Canonico.PARAMETROS_OPERACION, parametros);
+        }
+        return campos;
+    }
+
+    private void poner(Map<String, Object> campos, String nombre,
+                       RecaudacionRequest peticion, String clave) {
+        Object valor = peticion.datos().get(clave);
+        if (valor != null) {
+            campos.put(nombre, valor);
+        }
+    }
+
+    private void agregar(StringBuilder xml, String nombre, Object valor) {
+        if (valor == null) {
+            return;
+        }
+        String texto = valor.toString();
+        if (texto.isBlank()) {
+            return;
+        }
+        xml.append("<").append(nombre).append(">");
+        xml.append(escapar(texto));
+        xml.append("</").append(nombre).append(">");
+    }
+
+    @SuppressWarnings("unchecked")
+    private void agregarParametrosOperacion(StringBuilder xml, Object valor) {
+        if (!(valor instanceof List<?> lista)) {
+            return;
+        }
+        for (Object item : lista) {
+            if (!(item instanceof Map<?, ?> parametro)) {
+                continue;
+            }
+            xml.append("<parametrosOperacion>");
+            Object indice = parametro.get("indice");
+            Object valorParametro = parametro.get("valor");
+            if (indice != null) {
+                xml.append("<indice>").append(escapar(indice.toString())).append("</indice>");
+            }
+            if (valorParametro != null) {
+                xml.append("<valor>").append(escapar(valorParametro.toString())).append("</valor>");
+            }
+            xml.append("</parametrosOperacion>");
+        }
+    }
+
+    private String escapar(String valor) {
+        return valor
+            .replace("&", "&amp;")
+            .replace("<", "&lt;")
+            .replace(">", "&gt;")
+            .replace("\"", "&quot;")
+            .replace("'", "&apos;");
     }
 
     @Override
     public RecaudacionResponse interpretar(RespuestaCruda respuesta, RecaudacionRequest peticion) {
-        String operacion = peticion.operador().name();
-        YaGanasteTag yaGanasteTag = obtenerOperacion(operacion);
-        XmlMapper xmlMapper = new XmlMapper();
-        String codigo = "00";
-        String mensaje = "";
+        LOG.debugf("respuesta YAGANASTE operador=%s", peticion.operador());
+        NodoXml raiz = SoapSupport.cuerpo(respuesta.cuerpo());
+        NodoXml response = raiz.hijo("response") == null ? raiz : raiz.hijo("response");
+
+        String codigo = primero(texto(response, "responseCode"), texto(response, "codigo"), "");
+        if (codigo == null || codigo.isBlank()) {
+            throw new ProveedorException(
+                "Respuesta de YAGANASTE sin código",
+                ProveedorException.BAD_GATEWAY, false, null);
+        }
+        String mensaje = primero(texto(response, "errMessage"), texto(response, "mensaje"), "OK");
+
         Map<String, Object> cliente = Mapas.nuevo();
+        Mapas.poner(cliente, Canonico.NOMBRE_CLIENTE, texto(response, "nombreCliente"));
+
         Map<String, Object> transaccion = Mapas.nuevo();
-        try {
-            JsonNode root = xmlMapper.readTree(respuesta.cuerpo());
-            JsonNode response = root
-                .path("Body")
-                .path(yaGanasteTag.getTagResponse())
-                .path("response");
-    
-            Mapas.poner(transaccion, Canonico.REFERENCIA_OPERADOR, texto(response, "refOperador"));    
-            Mapas.poner(transaccion, Canonico.IMPORTE_ORIGEN, texto(response, "importe"));  
-            Mapas.poner(transaccion, "referenciaSigma", texto(response, "referenciaSigma"));
-            Mapas.poner(transaccion, Canonico.SALDO, texto(response, "saldo"));              
-              
-        } catch (JsonProcessingException e) {
-            throw new IllegalStateException("Respuesta inválida de " + institucion(), e);
-        }        
-        return RecaudacionResponse.de(institucion(), peticion.operador(), peticion.cabecera(),
-            codigo, mensaje, cliente,
+        Mapas.poner(transaccion, Canonico.ESTADO, texto(response, "estadoVenta"));
+        Mapas.poner(transaccion, Canonico.MONTO, numero(response, "importe"));
+        Mapas.poner(transaccion, Canonico.MONEDA, texto(response, "monedaOrigen"));
+        Mapas.poner(transaccion, Canonico.FEE, numero(response, "fee"));
+        Mapas.poner(transaccion, Canonico.IMPORTE_ORIGEN, numero(response, "importeOrigen"));
+        Mapas.poner(transaccion, Canonico.SALDO, numero(response, "saldo"));
+        Mapas.poner(transaccion, Canonico.REFERENCIA_PROVEEDOR, texto(response, "referenciaSigma"));
+        Mapas.poner(transaccion, Canonico.REFERENCIA_OPERADOR, texto(response, "refOperador"));
+
+        List<Map<String, Object>> parametros = parametros(response);
+        if (!parametros.isEmpty()) {
+            transaccion.put(Canonico.PARAMETROS, parametros);
+        }
+
+        return RecaudacionResponse.de(Institucion.YAGANASTE, peticion.operador(),
+            peticion.cabecera(), codigo, mensaje, cliente,
             transaccion.isEmpty() ? List.of() : List.of(transaccion));
-    } 
-    
-    private void poner(StringBuilder xml, String nombre,
-                       RecaudacionRequest peticion, String clave) {
-        Object valor = peticion.datos().get(clave);
-        if (valor != null && !valor.toString().isBlank()) {
-            xml.append("<").append(nombre).append(">");
-            xml.append(valor);
-            xml.append("</").append(nombre).append(">");
-        }
-    } 
-    private static String texto(JsonNode nodo, String campo) {
-        return nodo.hasNonNull(campo) && !nodo.get(campo).asText().isBlank()
-            ? nodo.get(campo).asText().trim()
-            : null;
-    }
-    private YaGanasteTag obtenerOperacion(String operador) {
-        return switch (operador) {
-            case "ECHO" -> YaGanasteTag.ECHO;
-            case "DEVOLUCION" -> YaGanasteTag.DEVOLUCION;
-            case "VENTA" -> YaGanasteTag.VENTA;
-            case "CONSULTA_PREVIA" -> YaGanasteTag.CONSULTA_PREVIA;
-            case "CONSULTA" -> YaGanasteTag.CONSULTA;
-            case "SALDO" -> YaGanasteTag.SALDO;
-            default -> throw new OperadorNoSoportadoException("Operación SOAP no soportada: " + operador);
-        };
     }
 
-    private enum YaGanasteTag {
-        ECHO("echo", "echoResponse"),
-        DEVOLUCION("devolucion", "devolucionResponse"),
-        VENTA("venta","ventaResponse"),
-        CONSULTA_PREVIA("consultaPrevia","consultaPreviaResponse"),
-        CONSULTA("consulta","consultaResponse"),
-        SALDO("saldo","saldoResponse");
-
-        private final String tagOperacion;
-        private final String tagResponse;
-
-        YaGanasteTag(String tagOperacion, String tagResponse) {
-            this.tagOperacion = tagOperacion;
-            this.tagResponse = tagResponse;
+    private static List<Map<String, Object>> parametros(NodoXml raiz) {
+        List<Map<String, Object>> parametros = new ArrayList<>();
+        for (String nombre : List.of("parametros", "parametro", "listaParametros")) {
+            for (NodoXml nodo : raiz.hijos(nombre)) {
+                Map<String, Object> parametro = Mapas.nuevo();
+                Mapas.poner(parametro, "indice", texto(nodo, "indice"));
+                Mapas.poner(parametro, "valor", texto(nodo, "valor"));
+                if (!parametro.isEmpty()) {
+                    parametros.add(parametro);
+                }
+            }
         }
+        return parametros;
+    }
 
-        public String getTagOperacion() {
-            return tagOperacion;
-        }
+    private static String texto(NodoXml nodo, String campo) {
+        String valor = nodo.textoDe(campo);
+        return valor == null || valor.isBlank() ? null : valor.trim();
+    }
 
-        public String getTagResponse() {
-            return tagResponse;
+    private static Object numero(NodoXml nodo, String campo) {
+        String valor = texto(nodo, campo);
+        if (valor == null) {
+            return null;
         }
+        try {
+            return new BigDecimal(valor);
+        } catch (NumberFormatException e) {
+            return valor;
+        }
+    }
+
+    private static String primero(String... valores) {
+        for (String valor : valores) {
+            if (valor != null && !valor.isBlank()) {
+                return valor;
+            }
+        }
+        return "";
     }
 }
