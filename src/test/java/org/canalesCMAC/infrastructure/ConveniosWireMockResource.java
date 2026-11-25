@@ -30,6 +30,8 @@ public class ConveniosWireMockResource implements QuarkusTestResourceLifecycleMa
     private WireMockServer muniCuscoServer;
     private WireMockServer payToPeruServer;
     private WireMockServer unsaacServer;
+    private WireMockServer westernUnionServer;
+    private WireMockServer univContinentalServer;
 
     @Override
     public Map<String, String> start() {
@@ -42,6 +44,8 @@ public class ConveniosWireMockResource implements QuarkusTestResourceLifecycleMa
         muniCuscoServer = servidor();
         payToPeruServer = servidor();
         unsaacServer = servidor();
+        westernUnionServer = servidor();
+        univContinentalServer = servidor();
         configurarElse();
         configurarEu();
         configurarSeal();
@@ -51,6 +55,8 @@ public class ConveniosWireMockResource implements QuarkusTestResourceLifecycleMa
         configurarMuniCusco();
         configurarPayToPeru();
         configurarUnsAac();
+        configurarWesternUnion();
+        configurarUnivContinental();
 
         Map<String, String> propiedades = new HashMap<>();
         propiedades.put("convenio.ELSE.url",
@@ -66,6 +72,12 @@ public class ConveniosWireMockResource implements QuarkusTestResourceLifecycleMa
         propiedades.put("convenio.UNSAAC.url",
             "http://localhost:" + unsaacServer.port() + "/demo-recaudacion");
         propiedades.put("convenio.UNSAAC.claveCifrado", "_aaaae00th@h%h1234");
+        propiedades.put("convenio.WESTERN_UNION.url",
+            "http://localhost:" + westernUnionServer.port() + "/mockGatewayService");
+        propiedades.put("convenio.UNIVCONTINENTAL_UNIVERSIDAD.url",
+            "http://localhost:" + univContinentalServer.port());
+        propiedades.put("convenio.UNIVCONTINENTAL_CIDIOMAS.url",
+            "http://localhost:" + univContinentalServer.port());
         return propiedades;
     }
 
@@ -73,7 +85,8 @@ public class ConveniosWireMockResource implements QuarkusTestResourceLifecycleMa
     public void stop() {
         for (WireMockServer servidor : new WireMockServer[] {
             elseServer, euServer, sealServer, claroServer, ucuscoServer, yaganasteServer,
-            muniCuscoServer, payToPeruServer, unsaacServer }) {
+            muniCuscoServer, payToPeruServer, unsaacServer, westernUnionServer,
+            univContinentalServer }) {
             if (servidor != null) {
                 servidor.stop();
             }
@@ -262,6 +275,33 @@ public class ConveniosWireMockResource implements QuarkusTestResourceLifecycleMa
             .willReturn(aResponse().withStatus(200)
                 .withHeader("Content-Type", "application/json")
                 .withBody(envelope(true, null, "M02", null))));
+    }
+
+    private void configurarWesternUnion() {
+        String respuesta = XML_HEADER
+            + "<soap:Envelope xmlns:soap=\"http://schemas.xmlsoap.org/soap/envelope/\"><soap:Body>"
+            + "<ns2:buscarProductoResponse xmlns:ns2=\"http://gcr.sepsa.com.ar/wsdl/GatewayService/\">"
+            + "<response><codigoRespuesta>00</codigoRespuesta>"
+            + "<refOperador>REF-OP-1</refOperador><referenciaSigma>REF-PROV-1</referenciaSigma>"
+            + "<descripcionCliente>CLIENTE WU</descripcionCliente>"
+            + "<importe>10.00</importe><moneda>PEN</moneda><estado>OK</estado>"
+            + "</response></ns2:buscarProductoResponse></soap:Body></soap:Envelope>";
+        westernUnionServer.stubFor(post(urlPathEqualTo("/mockGatewayService"))
+            .willReturn(aResponse().withStatus(200)
+                .withHeader("Content-Type", "text/xml; charset=utf-8")
+                .withBody(respuesta)));
+    }
+
+    private void configurarUnivContinental() {
+        String respuesta = "{\"Codigo\":\"00000\",\"Mensaje\":\"OK\",\"CodigoContrato\":\"12345678\","
+            + "\"Cliente\":\"ALUMNO CONTINENTAL\",\"NumeroOperacion\":\"OP-1\",\"Datos\":["
+            + "{\"FechaCreacion\":\"2026-09-01\",\"FechaVencimiento\":\"2026-10-01\","
+            + "\"Moneda\":\"PEN\",\"Monto\":250.00,\"NumeroDocumento\":\"DOC-1\","
+            + "\"Periodo\":\"2026-10\"}]}";
+        univContinentalServer.stubFor(post(urlPathEqualTo("/api/pagouniversidad/consulta"))
+            .willReturn(okJson(respuesta)));
+        univContinentalServer.stubFor(post(urlPathEqualTo("/api/pagoidiomas/consulta"))
+            .willReturn(okJson(respuesta)));
     }
 
     private String envelope(boolean exito, String mensaje, String codresp, String objeto) {
