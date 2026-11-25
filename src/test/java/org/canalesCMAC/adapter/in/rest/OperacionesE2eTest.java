@@ -348,4 +348,49 @@ class OperacionesE2eTest {
             .body("respuesta.transaccion[0].identificadorPago", is("V-000000000208456"))
             .body("respuesta.transaccion[0].clave", is("23300"));
     }
+
+    @Test
+    void westernUnionBuscarProductoFlujoCompleto() {
+        given()
+            .contentType(ContentType.JSON)
+            .body("{\"institucion\":\"WESTERN_UNION\",\"operador\":\"BUSCAR_PRODUCTO\",\"datos\":{"
+                + "\"filtro\":{\"idAgente\":\"77519999\",\"idLocacion\":\"91234\",\"caja\":\"C1234\"}}}")
+            .when().post("/api/v1/operaciones")
+            .then()
+            .statusCode(200)
+            .body("institucion", is("WESTERN_UNION"))
+            .body("respuesta.codigo", is("00"));
+    }
+
+    @Test
+    void universidadContinentalConsultaFlujoCompleto() {
+        given()
+            .contentType(ContentType.JSON)
+            .body("{\"institucion\":\"UNIVCONTINENTAL_UNIVERSIDAD\","
+                + "\"operador\":\"UNIVERSIDAD_CONSULTA_DEUDA\",\"datos\":{"
+                + "\"filtro\":{\"contrato\":\"12345678\",\"moneda\":\"PEN\",\"canal\":\"1\"}}}")
+            .when().post("/api/v1/operaciones")
+            .then()
+            .statusCode(200)
+            .body("institucion", is("UNIVCONTINENTAL_UNIVERSIDAD"))
+            .body("respuesta.codigo", is("00"))
+            .body("respuesta.cliente.nombreCliente", is("ALUMNO CONTINENTAL"))
+            .body("respuesta.transaccion[0].numeroOperacion", is("OP-1"));
+    }
+
+    @Test
+    void centroIdiomasConsultaFlujoCompleto() {
+        given()
+            .contentType(ContentType.JSON)
+            .body("{\"institucion\":\"UNIVCONTINENTAL_CIDIOMAS\","
+                + "\"operador\":\"CENTRO_IDIOMAS_CONSULTA_DEUDA\",\"datos\":{"
+                + "\"filtro\":{\"contrato\":\"12345678\",\"moneda\":\"PEN\",\"canal\":\"1\"}}}")
+            .when().post("/api/v1/operaciones")
+            .then()
+            .statusCode(200)
+            .body("institucion", is("UNIVCONTINENTAL_CIDIOMAS"))
+            .body("respuesta.codigo", is("00"))
+            .body("respuesta.cliente.nombreCliente", is("ALUMNO CONTINENTAL"))
+            .body("respuesta.transaccion[0].numeroOperacion", is("OP-1"));
+    }
 }
