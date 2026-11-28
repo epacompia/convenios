@@ -7,6 +7,9 @@ logs/
 .settings/
 .vscode/
 
+# Referencia de integracion de token (contiene credenciales de prueba)
+colecciones_json/
+
 # Documentacion (no se sube al repositorio)
 *.md
 *.docx
