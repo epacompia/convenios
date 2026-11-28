@@ -40,7 +40,7 @@ class EsquemaTest {
         try (Connection conexion = dataSource.getConnection();
              Statement sentencia = conexion.createStatement();
              ResultSet resultado = sentencia.executeQuery(
-                 "select table_name from information_schema.tables where table_schema = 'PUBLIC'")) {
+                 "select table_name from information_schema.tables where table_type = 'BASE TABLE'")) {
             while (resultado.next()) {
                 encontradas.add(resultado.getString(1).toLowerCase(Locale.ROOT));
             }
