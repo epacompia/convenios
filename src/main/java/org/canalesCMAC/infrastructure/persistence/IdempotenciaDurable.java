@@ -169,6 +169,11 @@ public class IdempotenciaDurable {
                 || mensaje.contains("constraint")) {
                 return true;
             }
+            if (actual instanceof java.sql.SQLException sql
+                && (sql.getErrorCode() == 2627 || sql.getErrorCode() == 2601
+                    || "23000".equals(sql.getSQLState()))) {
+                return true;
+            }
             actual = actual.getCause();
         }
         return false;
